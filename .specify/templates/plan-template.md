@@ -31,7 +31,20 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+Verify compliance with VRON Mobile Constitution (v1.0.0):
+
+- [ ] **I. Native-First Performance**: Does feature require platform channels? Will it meet 60fps UI / 30fps 3D targets?
+- [ ] **II. Offline-First**: Can feature work offline? Is cache strategy defined? How does sync handle conflicts?
+- [ ] **III. TDD**: Are acceptance criteria testable? Is test-first workflow planned?
+- [ ] **IV. Platform Integration**: Are channel contracts versioned? Do both iOS/Android implementations exist?
+- [ ] **V. Modular Architecture**: Is feature properly scoped as package or feature module? Are dependencies clean?
+- [ ] **VI. 3D Asset Fidelity**: Does feature preserve textures? Are quality gates defined (texture count, spatial accuracy)?
+- [ ] **VII. CI/CD**: Will feature integrate with existing pipeline? Are build/test steps defined?
+
+**Complexity Justifications** (only if violations exist):
+| Principle Violated | Justification | Simpler Alternative Rejected Because |
+|-------------------|---------------|-------------------------------------|
+| [e.g., Skipping TDD] | [throwaway prototype for user test] | [need rapid feedback before committing to full implementation] |
 
 ## Project Structure
 
@@ -51,48 +64,58 @@ specs/[###-feature]/
 <!--
   ACTION REQUIRED: Replace the placeholder tree below with the concrete layout
   for this feature. Delete unused options and expand the chosen structure with
-  real paths (e.g., apps/admin, packages/something). The delivered plan must
-  not include Option labels.
+  real paths (e.g., packages/vron_graphql_client, lib/features/scanning).
 -->
 
 ```text
-# [REMOVE IF UNUSED] Option 1: Single project (DEFAULT)
-src/
-├── models/
-├── services/
-├── cli/
-└── lib/
+# Flutter Mobile App Structure (VRON Mobile Constitution - Principle V: Modular Architecture)
 
-tests/
-├── contract/
-├── integration/
-└── unit/
+packages/
+├── vron_graphql_client/  # GraphQL operations, subscriptions, offline cache
+│   ├── lib/
+│   ├── test/
+│   └── pubspec.yaml
+├── room_scanner/         # Platform channels for LiDAR/ARCore
+│   ├── lib/
+│   ├── ios/             # Swift RoomPlan plugin
+│   ├── android/         # Kotlin ARCore plugin
+│   ├── test/
+│   └── pubspec.yaml
+├── asset_converter/      # USDZ→GLB, navmesh generation
+│   ├── lib/
+│   ├── ios/             # Swift Model I/O plugin
+│   ├── android/         # Kotlin GLB processing
+│   ├── test/
+│   └── pubspec.yaml
+└── vron_3d_viewer/       # 3D preview widget
+    ├── lib/
+    ├── test/
+    └── pubspec.yaml
 
-# [REMOVE IF UNUSED] Option 2: Web application (when "frontend" + "backend" detected)
-backend/
-├── src/
-│   ├── models/
-│   ├── services/
-│   └── api/
-└── tests/
+lib/
+├── features/
+│   ├── auth/            # Role-based auth matching SaaS
+│   ├── scanning/        # Room scanning UI and stitching
+│   ├── asset_sync/      # Real-time VR asset sync
+│   └── commerce/        # Immersive product placement
+├── shared/              # Common widgets, utilities
+└── main.dart
 
-frontend/
-├── src/
-│   ├── components/
-│   ├── pages/
-│   └── services/
-└── tests/
+test/
+├── widget_test/         # Widget tests (TDD requirement)
+├── integration_test/    # Platform channel integration tests
+└── golden_test/         # Visual regression tests
 
-# [REMOVE IF UNUSED] Option 3: Mobile + API (when "iOS/Android" detected)
-api/
-└── [same as backend above]
+ios/
+└── Runner/              # iOS-specific native code
 
-ios/ or android/
-└── [platform-specific structure: feature modules, UI flows, platform tests]
+android/
+└── app/                 # Android-specific native code
 ```
 
-**Structure Decision**: [Document the selected structure and reference the real
-directories captured above]
+**Structure Decision**: This follows Principle V (Modular Architecture) with standalone
+packages for reusable logic and feature-based organization in lib/. Platform channels
+are isolated in dedicated packages with native code in ios/android subdirectories.
 
 ## Complexity Tracking
 

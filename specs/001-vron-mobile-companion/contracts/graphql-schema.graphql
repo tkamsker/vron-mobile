@@ -1,0 +1,279 @@
+# GraphQL Schema for VRON Mobile Companion
+# API Endpoint: https://api.vron.stage.motorenflug.at/graphql
+# Headers: Authorization: Bearer <AUTH_CODE>, X-VRon-Platform: "merchants"
+
+# ============================================================================
+# Authentication
+# ============================================================================
+
+input SignInInput {
+  email: String!
+  password: String!
+}
+
+type SignInPayload {
+  accessToken: String!
+}
+
+type Mutation {
+  """
+  Authenticate user with email/password credentials.
+  Returns JWT access token to be encoded in base64 AUTH_CODE.
+  """
+  signIn(input: SignInInput!): SignInPayload!
+
+  """
+  Terminate current user session. Invalidates access token on server.
+  """
+  signOut: Boolean!
+}
+
+# ============================================================================
+# Projects
+# ============================================================================
+
+type Project {
+  id: ID!
+  name: String!
+  description: String
+  status: ProjectStatus!
+  thumbnailUrl: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  rooms: [Room!]!
+}
+
+enum ProjectStatus {
+  ACTIVE
+  INACTIVE
+}
+
+type Query {
+  """
+  Fetch all projects for authenticated user.
+  Supports pagination via first/after cursor pattern.
+  """
+  projects(first: Int = 20, after: String): ProjectConnection!
+
+  """
+  Fetch single project by ID with all rooms.
+  """
+  project(id: ID!): Project
+}
+
+type ProjectConnection {
+  edges: [ProjectEdge!]!
+  pageInfo: PageInfo!
+}
+
+type ProjectEdge {
+  node: Project!
+  cursor: String!
+}
+
+type PageInfo {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+  endCursor: String
+}
+
+input UpdateProjectInput {
+  id: ID!
+  name: String
+  description: String
+  status: ProjectStatus
+}
+
+type Mutation {
+  """
+  Update project metadata (name, description, status).
+  Users cannot create or delete projects (managed via web platform).
+  """
+  updateProject(input: UpdateProjectInput!): Project!
+}
+
+# ============================================================================
+# Rooms
+# ============================================================================
+
+type Room {
+  id: ID!
+  projectId: ID!
+  name: String!
+  scanDate: DateTime!
+  sceneGlbUrl: String
+  navmeshGlbUrl: String
+  sceneFileSize: Int
+  navmeshFileSize: Int
+  processingStatus: RoomProcessingStatus!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+enum RoomProcessingStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+type Query {
+  """
+  Fetch all rooms for a specific project.
+  """
+  rooms(projectId: ID!): [Room!]!
+
+  """
+  Fetch single room by ID.
+  """
+  room(id: ID!): Room
+}
+
+input CreateRoomInput {
+  projectId: ID!
+  name: String!
+  scanDate: DateTime!
+}
+
+input UploadRoomAssetsInput {
+  roomId: ID!
+  sceneGlbUrl: String
+  navmeshGlbUrl: String
+  sceneFileSize: Int
+  navmeshFileSize: Int
+}
+
+input UpdateRoomInput {
+  id: ID!
+  name: String
+}
+
+type Mutation {
+  """
+  Create new room entry after successful scan.
+  Returns room ID for subsequent asset upload.
+  """
+  createRoom(input: CreateRoomInput!): Room!
+
+  """
+  Associate uploaded GLB files with room after successful upload.
+  Updates room.sceneGlbUrl and room.navmeshGlbUrl with CDN URLs.
+  """
+  uploadRoomAssets(input: UploadRoomAssetsInput!): Room!
+
+  """
+  Update room name (user-editable after auto-generation).
+  """
+  updateRoom(input: UpdateRoomInput!): Room!
+}
+
+# ============================================================================
+# File Uploads
+# ============================================================================
+
+"""
+Request presigned upload URL for GLB file.
+Client uploads directly to S3/CDN with presigned URL, then calls uploadRoomAssets.
+"""
+type UploadUrl {
+  uploadUrl: String!
+  fileKey: String!
+  expiresAt: DateTime!
+}
+
+input RequestUploadUrlInput {
+  roomId: ID!
+  fileType: FileType!
+  fileName: String!
+  fileSize: Int!
+}
+
+enum FileType {
+  SCENE_GLB
+  NAVMESH_GLB
+}
+
+type Query {
+  """
+  Request presigned upload URL for scene or navmesh GLB file.
+  Returns S3 presigned URL valid for 1 hour.
+  """
+  requestUploadUrl(input: RequestUploadUrlInput!): UploadUrl!
+}
+
+# ============================================================================
+# Demo Assets
+# ============================================================================
+
+type DemoAsset {
+  id: ID!
+  theme: DemoTheme!
+  name: String!
+  glbUrl: String!
+  previewThumbnailUrl: String!
+  description: String
+  metadata: JSON
+  displayOrder: Int!
+}
+
+enum DemoTheme {
+  SAILING
+  AVIATION
+}
+
+type Query {
+  """
+  Fetch all demo assets for sailing/aviation themes.
+  Cached for 7 days on client.
+  """
+  demoAssets(theme: DemoTheme): [DemoAsset!]!
+}
+
+# ============================================================================
+# Real-Time Subscriptions
+# ============================================================================
+
+type Subscription {
+  """
+  Subscribe to project updates for authenticated user.
+  Receives events when projects are modified on web platform.
+  """
+  projectUpdated: Project!
+
+  """
+  Subscribe to room updates for a specific project.
+  Receives events when rooms are uploaded by other devices.
+  """
+  roomUpdated(projectId: ID!): Room!
+}
+
+# ============================================================================
+# Scalar Types
+# ============================================================================
+
+"""
+DateTime scalar in ISO 8601 format (e.g., 2025-11-30T14:23:00Z).
+"""
+scalar DateTime
+
+"""
+JSON scalar for arbitrary JSON data (e.g., demo asset metadata).
+"""
+scalar JSON
+
+# ============================================================================
+# Error Codes
+# ============================================================================
+
+"""
+Standard error responses follow GraphQL spec with extensions.
+Error codes in extensions.code:
+- UNAUTHENTICATED: Missing or invalid auth token
+- FORBIDDEN: Insufficient permissions for operation
+- NOT_FOUND: Requested resource does not exist
+- VALIDATION_ERROR: Input validation failed
+- FILE_TOO_LARGE: Uploaded file exceeds 50MB limit
+- RATE_LIMIT_EXCEEDED: Too many requests (429)
+- INTERNAL_SERVER_ERROR: Unexpected server error (500)
+"""

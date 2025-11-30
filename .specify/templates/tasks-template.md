@@ -79,21 +79,32 @@ Examples of foundational tasks (adjust based on your project):
 
 **Independent Test**: [How to verify this story works on its own]
 
-### Tests for User Story 1 (OPTIONAL - only if tests requested) ⚠️
+### Tests for User Story 1 (MANDATORY for VRON Mobile - TDD Principle III) ⚠️
 
-> **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
+> **TDD REQUIREMENT: Write these tests FIRST, ensure they FAIL before implementation**
+> Constitution Principle III: TDD is NON-NEGOTIABLE for all feature work
 
-- [ ] T010 [P] [US1] Contract test for [endpoint] in tests/contract/test_[name].py
-- [ ] T011 [P] [US1] Integration test for [user journey] in tests/integration/test_[name].py
+- [ ] T010 [P] [US1] Widget test for [UI component] in test/widget_test/[name]_test.dart
+- [ ] T011 [P] [US1] Unit test for [business logic] in test/[feature]/[name]_test.dart
+- [ ] T012 [US1] Integration test for [platform channel] in test/integration_test/[name]_test.dart
+- [ ] T013 [US1] Golden test for [UI flow] in test/golden_test/[name]_golden_test.dart (if critical UI)
 
 ### Implementation for User Story 1
 
-- [ ] T012 [P] [US1] Create [Entity1] model in src/models/[entity1].py
-- [ ] T013 [P] [US1] Create [Entity2] model in src/models/[entity2].py
-- [ ] T014 [US1] Implement [Service] in src/services/[service].py (depends on T012, T013)
-- [ ] T015 [US1] Implement [endpoint/feature] in src/[location]/[file].py
-- [ ] T016 [US1] Add validation and error handling
-- [ ] T017 [US1] Add logging for user story 1 operations
+> **REMINDER: Tests must FAIL before starting implementation (TDD red phase)**
+
+- [ ] T014 [P] [US1] Create [Entity1] model in lib/features/[feature]/models/[entity1].dart
+- [ ] T015 [P] [US1] Create [Entity2] model in lib/features/[feature]/models/[entity2].dart
+- [ ] T016 [US1] Implement [Service/Bloc] in lib/features/[feature]/[service].dart (depends on T014, T015)
+- [ ] T017 [US1] Implement [UI widget] in lib/features/[feature]/widgets/[widget].dart
+- [ ] T018 [US1] Add offline caching logic (Constitution Principle II - Offline-First)
+- [ ] T019 [US1] Add platform channel integration if needed (Constitution Principle IV)
+- [ ] T020 [US1] Verify performance targets: 60fps UI / 30fps 3D (Constitution Principle I)
+
+**Platform-Specific Tasks (if needed)**:
+- [ ] T021 [P] [US1] iOS native implementation in packages/[package]/ios/Classes/[Name].swift
+- [ ] T022 [P] [US1] Android native implementation in packages/[package]/android/src/main/kotlin/[Name].kt
+- [ ] T023 [US1] Test platform channel contracts on both iOS and Android devices
 
 **Checkpoint**: At this point, User Story 1 should be fully functional and testable independently
 
@@ -105,17 +116,20 @@ Examples of foundational tasks (adjust based on your project):
 
 **Independent Test**: [How to verify this story works on its own]
 
-### Tests for User Story 2 (OPTIONAL - only if tests requested) ⚠️
+### Tests for User Story 2 (MANDATORY for VRON Mobile - TDD Principle III) ⚠️
 
-- [ ] T018 [P] [US2] Contract test for [endpoint] in tests/contract/test_[name].py
-- [ ] T019 [P] [US2] Integration test for [user journey] in tests/integration/test_[name].py
+> **TDD REQUIREMENT: Write these tests FIRST, ensure they FAIL before implementation**
+
+- [ ] T024 [P] [US2] Widget test for [UI component] in test/widget_test/[name]_test.dart
+- [ ] T025 [P] [US2] Unit test for [business logic] in test/[feature]/[name]_test.dart
+- [ ] T026 [US2] Integration test for [platform channel] in test/integration_test/[name]_test.dart
 
 ### Implementation for User Story 2
 
-- [ ] T020 [P] [US2] Create [Entity] model in src/models/[entity].py
-- [ ] T021 [US2] Implement [Service] in src/services/[service].py
-- [ ] T022 [US2] Implement [endpoint/feature] in src/[location]/[file].py
-- [ ] T023 [US2] Integrate with User Story 1 components (if needed)
+- [ ] T027 [P] [US2] Create [Entity] model in lib/features/[feature]/models/[entity].dart
+- [ ] T028 [US2] Implement [Service/Bloc] in lib/features/[feature]/[service].dart
+- [ ] T029 [US2] Implement [UI widget] in lib/features/[feature]/widgets/[widget].dart
+- [ ] T030 [US2] Integrate with User Story 1 components (if needed)
 
 **Checkpoint**: At this point, User Stories 1 AND 2 should both work independently
 
@@ -127,16 +141,19 @@ Examples of foundational tasks (adjust based on your project):
 
 **Independent Test**: [How to verify this story works on its own]
 
-### Tests for User Story 3 (OPTIONAL - only if tests requested) ⚠️
+### Tests for User Story 3 (MANDATORY for VRON Mobile - TDD Principle III) ⚠️
 
-- [ ] T024 [P] [US3] Contract test for [endpoint] in tests/contract/test_[name].py
-- [ ] T025 [P] [US3] Integration test for [user journey] in tests/integration/test_[name].py
+> **TDD REQUIREMENT: Write these tests FIRST, ensure they FAIL before implementation**
+
+- [ ] T031 [P] [US3] Widget test for [UI component] in test/widget_test/[name]_test.dart
+- [ ] T032 [P] [US3] Unit test for [business logic] in test/[feature]/[name]_test.dart
+- [ ] T033 [US3] Integration test for [platform channel] in test/integration_test/[name]_test.dart
 
 ### Implementation for User Story 3
 
-- [ ] T026 [P] [US3] Create [Entity] model in src/models/[entity].py
-- [ ] T027 [US3] Implement [Service] in src/services/[service].py
-- [ ] T028 [US3] Implement [endpoint/feature] in src/[location]/[file].py
+- [ ] T034 [P] [US3] Create [Entity] model in lib/features/[feature]/models/[entity].dart
+- [ ] T035 [US3] Implement [Service/Bloc] in lib/features/[feature]/[service].dart
+- [ ] T036 [US3] Implement [UI widget] in lib/features/[feature]/widgets/[widget].dart
 
 **Checkpoint**: All user stories should now be independently functional
 
@@ -152,9 +169,12 @@ Examples of foundational tasks (adjust based on your project):
 
 - [ ] TXXX [P] Documentation updates in docs/
 - [ ] TXXX Code cleanup and refactoring
-- [ ] TXXX Performance optimization across all stories
-- [ ] TXXX [P] Additional unit tests (if requested) in tests/unit/
-- [ ] TXXX Security hardening
+- [ ] TXXX Performance validation: 60fps UI / 30fps 3D targets (Constitution Principle I)
+- [ ] TXXX Verify test coverage >80% (Constitution Principle III)
+- [ ] TXXX [P] CI/CD pipeline integration (Constitution Principle VII)
+- [ ] TXXX [P] Verify offline-first behavior across all features (Constitution Principle II)
+- [ ] TXXX Security hardening and RBAC validation (Constitution Technical Constraints)
+- [ ] TXXX 3D asset fidelity validation: texture preservation, spatial accuracy (Constitution Principle VI)
 - [ ] TXXX Run quickstart.md validation
 
 ---
