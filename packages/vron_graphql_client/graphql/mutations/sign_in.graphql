@@ -1,0 +1,15 @@
+mutation SignIn($email: String!, $password: String!) {
+  signIn(input: { email: $email, password: $password }) {
+    user {
+      id
+      email
+      firstName
+      lastName
+      role
+      createdAt
+      updatedAt
+    }
+    token
+    expiresAt
+  }
+}

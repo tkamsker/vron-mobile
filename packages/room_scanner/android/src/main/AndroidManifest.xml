@@ -1,0 +1,22 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="one.vron.room_scanner">
+
+    <!-- Required for ARCore -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <!-- ARCore requires OpenGL ES 3.0+ -->
+    <uses-feature
+        android:name="android.hardware.camera.ar"
+        android:required="false" />
+    <uses-feature
+        android:glEsVersion="0x00030000"
+        android:required="true" />
+
+    <!-- Indicates this app requires ARCore ("AR Required") -->
+    <!-- For "AR Optional" apps, change android:required to "false" -->
+    <application>
+        <meta-data
+            android:name="com.google.ar.core"
+            android:value="optional" />
+    </application>
+</manifest>

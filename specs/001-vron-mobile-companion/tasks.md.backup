@@ -28,16 +28,16 @@ Flutter project structure per plan.md:
 
 **Purpose**: Project initialization and basic structure
 
-- [X] T001 Create Flutter project structure with modular architecture (packages/ and lib/features/)
-- [X] T002 Initialize Flutter 3.24+ project with pubspec.yaml dependencies (graphql_flutter ^5.1.0, riverpod ^2.4.0, drift ^2.14.0, hive ^2.2.3)
-- [X] T003 [P] Create package structure for vron_graphql_client in packages/vron_graphql_client/
-- [X] T004 [P] Create package structure for room_scanner in packages/room_scanner/
-- [X] T005 [P] Create package structure for asset_converter in packages/asset_converter/
-- [X] T006 [P] Create package structure for vron_3d_viewer in packages/vron_3d_viewer/
-- [X] T007 [P] Configure Dart analysis options with strict linting in analysis_options.yaml
-- [X] T008 [P] Setup test directory structure: test/widget_test/, test/integration_test/, test/golden_test/
-- [X] T009 [P] Create .env file template with GRAPHQL_ENDPOINT and GRAPHQL_WS_ENDPOINT placeholders
-- [X] T010 Add flutter_dotenv ^5.1.0 dependency and load environment config in main.dart
+- [ ] T001 Create Flutter project structure with modular architecture (packages/ and lib/features/)
+- [ ] T002 Initialize Flutter 3.24+ project with pubspec.yaml dependencies (graphql_flutter ^5.1.0, riverpod ^2.4.0, drift ^2.14.0, hive ^2.2.3)
+- [ ] T003 [P] Create package structure for vron_graphql_client in packages/vron_graphql_client/
+- [ ] T004 [P] Create package structure for room_scanner in packages/room_scanner/
+- [ ] T005 [P] Create package structure for asset_converter in packages/asset_converter/
+- [ ] T006 [P] Create package structure for vron_3d_viewer in packages/vron_3d_viewer/
+- [ ] T007 [P] Configure Dart analysis options with strict linting in analysis_options.yaml
+- [ ] T008 [P] Setup test directory structure: test/widget_test/, test/integration_test/, test/golden_test/
+- [ ] T009 [P] Create .env file template with GRAPHQL_ENDPOINT and GRAPHQL_WS_ENDPOINT placeholders
+- [ ] T010 Add flutter_dotenv ^5.1.0 dependency and load environment config in main.dart
 
 ---
 
@@ -49,45 +49,45 @@ Flutter project structure per plan.md:
 
 ### GraphQL Client Foundation
 
-- [X] T011 Create GraphQL client provider in packages/vron_graphql_client/lib/src/graphql_client_provider.dart
-- [X] T012 Implement auth link with base64-encoded token construction in packages/vron_graphql_client/lib/src/auth_link.dart
-- [X] T013 Configure HttpLink with required headers (Authorization, X-VRon-Platform: merchants) in packages/vron_graphql_client/lib/src/http_link.dart
-- [X] T014 Configure WebSocketLink for GraphQL subscriptions in packages/vron_graphql_client/lib/src/ws_link.dart
-- [X] T015 Setup GraphQLCache with HiveStore for offline caching in packages/vron_graphql_client/lib/src/cache_config.dart
-- [X] T016 Create GraphQL codegen configuration in packages/vron_graphql_client/build.yaml for type-safe operations
-- [X] T017 Copy GraphQL schema to packages/vron_graphql_client/graphql/schema.graphql from contracts/graphql-schema.graphql
+- [ ] T011 Create GraphQL client provider in packages/vron_graphql_client/lib/src/graphql_client_provider.dart
+- [ ] T012 Implement auth link with base64-encoded token construction in packages/vron_graphql_client/lib/src/auth_link.dart
+- [ ] T013 Configure HttpLink with required headers (Authorization, X-VRon-Platform: merchants) in packages/vron_graphql_client/lib/src/http_link.dart
+- [ ] T014 Configure WebSocketLink for GraphQL subscriptions in packages/vron_graphql_client/lib/src/ws_link.dart
+- [ ] T015 Setup GraphQLCache with HiveStore for offline caching in packages/vron_graphql_client/lib/src/cache_config.dart
+- [ ] T016 Create GraphQL codegen configuration in packages/vron_graphql_client/build.yaml for type-safe operations
+- [ ] T017 Copy GraphQL schema to packages/vron_graphql_client/graphql/schema.graphql from contracts/graphql-schema.graphql
 
 ### Database Foundation
 
-- [X] T018 Create Drift database schema in lib/core/database/database.drift with projects, rooms, upload_queue tables
-- [X] T019 Generate Drift database classes by running build_runner in lib/core/database/database.dart
-- [X] T020 Create Drift database provider with lazy initialization in lib/core/database/database_provider.dart
-- [X] T021 Setup Hive boxes for GraphQL cache with 24-hour TTL in lib/core/cache/hive_cache.dart
-- [X] T022 Implement cache eviction strategy (LRU + TTL) in lib/core/cache/cache_manager.dart
+- [ ] T018 Create Drift database schema in lib/core/database/database.drift with projects, rooms, upload_queue tables
+- [ ] T019 Generate Drift database classes by running build_runner in lib/core/database/database.dart
+- [ ] T020 Create Drift database provider with lazy initialization in lib/core/database/database_provider.dart
+- [ ] T021 Setup Hive boxes for GraphQL cache with 24-hour TTL in lib/core/cache/hive_cache.dart
+- [ ] T022 Implement cache eviction strategy (LRU + TTL) in lib/core/cache/cache_manager.dart
 
 ### Authentication Foundation
 
-- [X] T023 Setup flutter_secure_storage provider in lib/core/auth/secure_storage_provider.dart
-- [X] T024 Create auth token encoding/decoding utilities in lib/core/auth/token_utils.dart (base64 format per AUTHENTICATION.md)
-- [X] T025 Create AuthState model with states: initial, loading, authenticated, unauthenticated, error in lib/core/auth/auth_state.dart
-- [X] T026 Create AuthNotifier with signIn, signOut, refresh methods in lib/core/auth/auth_notifier.dart
+- [ ] T023 Setup flutter_secure_storage provider in lib/core/auth/secure_storage_provider.dart
+- [ ] T024 Create auth token encoding/decoding utilities in lib/core/auth/token_utils.dart (base64 format per AUTHENTICATION.md)
+- [ ] T025 Create AuthState model with states: initial, loading, authenticated, unauthenticated, error in lib/core/auth/auth_state.dart
+- [ ] T026 Create AuthNotifier with signIn, signOut, refresh methods in lib/core/auth/auth_notifier.dart
 
 ### Platform Channel Foundation
 
-- [X] T027 Create platform channel contract definitions in packages/room_scanner/lib/src/room_scanner_channel.dart
-- [X] T028 Create platform channel contract definitions in packages/asset_converter/lib/src/asset_converter_channel.dart
-- [X] T029 Setup iOS plugin structure: Runner.xcworkspace, Classes/, in packages/room_scanner/ios/
-- [X] T030 Setup Android plugin structure: kotlin/, AndroidManifest.xml in packages/room_scanner/android/
-- [X] T031 Setup iOS plugin structure for asset_converter in packages/asset_converter/ios/
-- [X] T032 Setup Android plugin structure for asset_converter in packages/asset_converter/android/
+- [ ] T027 Create platform channel contract definitions in packages/room_scanner/lib/src/room_scanner_channel.dart
+- [ ] T028 Create platform channel contract definitions in packages/asset_converter/lib/src/asset_converter_channel.dart
+- [ ] T029 Setup iOS plugin structure: Runner.xcworkspace, Classes/, in packages/room_scanner/ios/
+- [ ] T030 Setup Android plugin structure: kotlin/, AndroidManifest.xml in packages/room_scanner/android/
+- [ ] T031 Setup iOS plugin structure for asset_converter in packages/asset_converter/ios/
+- [ ] T032 Setup Android plugin structure for asset_converter in packages/asset_converter/android/
 
 ### Error Handling & Utilities
 
-- [X] T033 Create custom exception classes for GraphQL errors in lib/core/errors/graphql_exceptions.dart
-- [X] T034 Create custom exception classes for platform channel errors in lib/core/errors/platform_exceptions.dart
-- [X] T035 [P] Create retry strategy with exponential backoff (1s, 2s, 4s) in lib/core/network/retry_strategy.dart
-- [X] T036 [P] Create file utilities for temp file management in lib/core/utils/file_utils.dart
-- [X] T037 [P] Create logger utility with log levels in lib/core/utils/logger.dart
+- [ ] T033 Create custom exception classes for GraphQL errors in lib/core/errors/graphql_exceptions.dart
+- [ ] T034 Create custom exception classes for platform channel errors in lib/core/errors/platform_exceptions.dart
+- [ ] T035 [P] Create retry strategy with exponential backoff (1s, 2s, 4s) in lib/core/network/retry_strategy.dart
+- [ ] T036 [P] Create file utilities for temp file management in lib/core/utils/file_utils.dart
+- [ ] T037 [P] Create logger utility with log levels in lib/core/utils/logger.dart
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
@@ -103,22 +103,22 @@ Flutter project structure per plan.md:
 
 > **TDD REQUIREMENT: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [X] T038 [P] [US1] Widget test for login form validation in test/widget_test/features/auth/login_form_test.dart
-- [X] T039 [P] [US1] Widget test for login screen UI in test/widget_test/features/auth/login_screen_test.dart
-- [X] T040 [P] [US1] Unit test for auth token encoding/decoding in test/core/auth/token_utils_test.dart
-- [X] T041 [P] [US1] Unit test for AuthNotifier signIn logic in test/core/auth/auth_notifier_signin_test.dart
-- [X] T042 [P] [US1] Unit test for AuthNotifier signOut logic in test/core/auth/auth_notifier_signout_test.dart
-- [X] T043 [US1] Integration test for complete login flow with mock GraphQL in test/integration_test/auth_flow_test.dart
-- [X] T044 [US1] Golden test for login screen UI in test/golden_test/auth/login_screen_golden_test.dart
+- [ ] T038 [P] [US1] Widget test for login form validation in test/widget_test/features/auth/login_form_test.dart
+- [ ] T039 [P] [US1] Widget test for login screen UI in test/widget_test/features/auth/login_screen_test.dart
+- [ ] T040 [P] [US1] Unit test for auth token encoding/decoding in test/core/auth/token_utils_test.dart
+- [ ] T041 [P] [US1] Unit test for AuthNotifier signIn logic in test/core/auth/auth_notifier_test.dart
+- [ ] T042 [P] [US1] Unit test for AuthNotifier signOut logic in test/core/auth/auth_notifier_test.dart
+- [ ] T043 [US1] Integration test for complete login flow with mock GraphQL in test/integration_test/auth_flow_test.dart
+- [ ] T044 [US1] Golden test for login screen UI in test/golden_test/auth/login_screen_golden_test.dart
 
 ### GraphQL Operations for User Story 1
 
 > **REMINDER: Tests must FAIL before starting implementation (TDD red phase)**
 
-- [X] T045 [P] [US1] Create SignIn mutation GraphQL document in packages/vron_graphql_client/graphql/mutations/sign_in.graphql
-- [X] T046 [P] [US1] Create SignOut mutation GraphQL document in packages/vron_graphql_client/graphql/mutations/sign_out.graphql
-- [X] T047 [US1] Run graphql_codegen to generate type-safe mutation classes (manual implementation for now)
-- [X] T048 [US1] Create AuthRepository with signIn and signOut methods in packages/vron_graphql_client/lib/src/repositories/auth_repository.dart
+- [ ] T045 [P] [US1] Create SignIn mutation GraphQL document in packages/vron_graphql_client/graphql/mutations/sign_in.graphql
+- [ ] T046 [P] [US1] Create SignOut mutation GraphQL document in packages/vron_graphql_client/graphql/mutations/sign_out.graphql
+- [ ] T047 [US1] Run graphql_codegen to generate type-safe mutation classes in packages/vron_graphql_client/lib/src/generated/
+- [ ] T048 [US1] Create AuthRepository with signIn and signOut methods in packages/vron_graphql_client/lib/src/repositories/auth_repository.dart
 
 ### UI Implementation for User Story 1
 
