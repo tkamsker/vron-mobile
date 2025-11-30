@@ -4,6 +4,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:vron_mobile/core/auth/auth_notifier.dart';
 import 'package:vron_mobile/features/auth/screens/login_screen.dart';
+import 'package:vron_mobile/core/navigation/main_navigation.dart';
 
 /// VRON Mobile Companion App
 /// Flutter mobile app for real estate project scanning and management
@@ -21,7 +22,14 @@ Future<void> main() async {
   // Initialize Hive for local caching
   await Hive.initFlutter();
 
-  // Open required Hive boxes with correct types
+  // Clear any existing GraphQL cache to prevent type mismatch issues
+  try {
+    await Hive.deleteBoxFromDisk('graphqlCache');
+  } catch (_) {
+    // Ignore if box doesn't exist
+  }
+
+  // Open required Hive boxes with proper types for HiveStore
   await Hive.openBox<Map<dynamic, dynamic>?>('graphqlCache'); // For GraphQL cache
   await Hive.openBox('auth'); // For auth tokens
   await Hive.openBox('cache'); // For general cache
@@ -55,7 +63,7 @@ class VronMobileApp extends StatelessWidget {
       home: const SplashScreen(),
       routes: {
         '/login': (context) => const LoginScreen(),
-        '/projects': (context) => const ProjectsListPlaceholder(),
+        '/projects': (context) => const MainNavigationScreen(),
         '/signup': (context) => const SignUpPlaceholder(),
       },
     );

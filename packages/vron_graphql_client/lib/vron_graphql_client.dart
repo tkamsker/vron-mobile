@@ -10,6 +10,7 @@ library;
 export 'src/graphql_client_provider.dart';
 export 'src/auth_link.dart';
 export 'src/cache_config.dart';
+export 'src/repositories/project_repository.dart';
 
 // Re-export commonly used graphql_flutter types
 export 'package:graphql_flutter/graphql_flutter.dart'

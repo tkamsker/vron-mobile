@@ -6,6 +6,7 @@ import 'auth_state.dart';
 import 'auth_provider.dart';
 import '../cache/cache_manager.dart';
 import '../database/database_provider.dart';
+import '../database/user_cache.dart';
 
 /// Sign in input
 class SignInInput {
@@ -35,12 +36,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final AuthTokenManager _tokenManager;
   final CacheManager _cacheManager;
   final DatabaseOperations _dbOps;
+  final UserCacheOperations _userCache;
 
   AuthNotifier(
     this._graphqlClient,
     this._tokenManager,
     this._cacheManager,
     this._dbOps,
+    this._userCache,
   ) : super(const AuthState.initial()) {
     // Check if user is already authenticated on initialization
     _checkAuthStatus();
@@ -134,6 +137,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final userId = email; // TODO: Extract from JWT token
       await _tokenManager.saveUserId(userId);
 
+      // Cache user profile data in Drift for offline access (T057)
+      await _userCache.cacheUserProfile(
+        userId: userId,
+        email: email,
+        accessToken: accessToken,
+        activeRoles: const [], // TODO: Extract roles from response when available
+      );
+
       state = AuthState.authenticated(
         userId: userId,
         userEmail: email,
@@ -175,6 +186,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // Clear caches
       await _cacheManager.clearAll();
       await _dbOps.clearAllCache();
+      await _userCache.clearAllUsers(); // Clear user cache on sign out
 
       state = const AuthState.unauthenticated();
     } catch (e) {
@@ -261,12 +273,14 @@ final authNotifierProvider =
   final tokenManager = ref.watch(authTokenManagerProvider);
   final cacheManager = ref.watch(cacheManagerProvider);
   final dbOps = ref.watch(databaseOperationsProvider);
+  final userCache = ref.watch(userCacheOperationsProvider);
 
   return AuthNotifier(
     graphqlClient,
     tokenManager,
     cacheManager,
     dbOps,
+    userCache,
   );
 });
 

@@ -10,7 +10,7 @@ import 'package:hive/hive.dart';
 /// - Normalized cache for efficient storage
 GraphQLCache createGraphQLCache() {
   // Use Hive for persistent cache storage
-  // Get the box that was opened with correct type in main.dart
+  // Get the correctly typed box that was opened in main.dart
   final box = Hive.box<Map<dynamic, dynamic>?>('graphqlCache');
   final store = HiveStore(box);
 

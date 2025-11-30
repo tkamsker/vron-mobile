@@ -1,0 +1,19 @@
+query Project($id: ID!) {
+  project(id: $id) {
+    id
+    name
+    description
+    status
+    thumbnailUrl
+    createdAt
+    updatedAt
+    rooms {
+      id
+      name
+      sceneUrl
+      navmeshUrl
+      createdAt
+      updatedAt
+    }
+  }
+}

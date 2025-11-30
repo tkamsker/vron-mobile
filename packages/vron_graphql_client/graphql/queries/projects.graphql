@@ -1,0 +1,30 @@
+query GetProjects {
+  getProjects {
+    id
+    slug
+    name {
+      text
+    }
+    imageUrl
+    isLive
+    liveDate
+    subscription {
+      canChoosePlan
+      prices {
+        monthly
+        yearly
+        currency
+      }
+      isTrial
+      status
+      startedAt
+      expiresAt
+      renewsAt
+      price
+      currency
+      renewalInterval
+      hasExpired
+      isActive
+    }
+  }
+}

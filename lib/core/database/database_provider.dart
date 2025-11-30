@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'database.dart';
+import 'user_cache.dart';
 
 /// Database provider with lazy initialization
 ///
@@ -109,4 +110,10 @@ class DatabaseOperations {
 final databaseOperationsProvider = Provider<DatabaseOperations>((ref) {
   final db = ref.watch(databaseProvider);
   return DatabaseOperations(db);
+});
+
+/// User cache operations provider
+final userCacheOperationsProvider = Provider<UserCacheOperations>((ref) {
+  final db = ref.watch(databaseProvider);
+  return UserCacheOperations(db);
 });

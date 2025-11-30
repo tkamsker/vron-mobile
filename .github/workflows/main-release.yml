@@ -1,0 +1,156 @@
+name: Main - Production Release
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release:
+    name: Create Release and Deploy to Production
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.38.2'
+          channel: 'stable'
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Run tests
+        run: flutter test
+
+      - name: Setup Node.js for semantic-release
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install semantic-release
+        run: |
+          npm install -g semantic-release @semantic-release/changelog @semantic-release/git @semantic-release/exec conventional-changelog-conventionalcommits
+
+      - name: Run semantic-release
+        id: semantic_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npx semantic-release | tee semantic-release.log
+          NEW_VERSION=$(grep "Published release" semantic-release.log | sed -E 's/.*([0-9]+\.[0-9]+\.[0-9]+).*/\1/' || echo "")
+          if [ -z "$NEW_VERSION" ]; then
+            echo "No new version released"
+            echo "SKIP_DEPLOY=true" >> $GITHUB_OUTPUT
+          else
+            echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
+            echo "SKIP_DEPLOY=false" >> $GITHUB_OUTPUT
+            echo "Released version: $NEW_VERSION"
+          fi
+
+      - name: Setup Ruby
+        if: steps.semantic_release.outputs.SKIP_DEPLOY != 'true'
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+
+      - name: Install Fastlane
+        if: steps.semantic_release.outputs.SKIP_DEPLOY != 'true'
+        run: |
+          cd ios
+          bundle install
+
+      - name: Setup App Store Connect API Key
+        if: steps.semantic_release.outputs.SKIP_DEPLOY != 'true'
+        env:
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+        run: |
+          mkdir -p ~/private_keys
+          echo "$APP_STORE_CONNECT_API_KEY" | base64 --decode > ~/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8
+
+      - name: Setup code signing
+        if: steps.semantic_release.outputs.SKIP_DEPLOY != 'true'
+        env:
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+          FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD: ${{ secrets.FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD }}
+        run: |
+          cd ios
+          bundle exec fastlane match appstore --readonly
+
+      - name: Generate build number
+        if: steps.semantic_release.outputs.SKIP_DEPLOY != 'true'
+        id: build_number
+        run: |
+          BUILD_NUMBER=$(date +%Y%m%d%H%M)
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+          echo "Generated build number: $BUILD_NUMBER"
+
+      - name: Build iOS app
+        if: steps.semantic_release.outputs.SKIP_DEPLOY != 'true'
+        env:
+          BUILD_NUMBER: ${{ steps.build_number.outputs.BUILD_NUMBER }}
+          VERSION: ${{ steps.semantic_release.outputs.NEW_VERSION }}
+        run: |
+          flutter build ios --release --build-number=$BUILD_NUMBER --build-name=$VERSION
+
+      - name: Deploy to TestFlight (Production track)
+        if: steps.semantic_release.outputs.SKIP_DEPLOY != 'true'
+        env:
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          cd ios
+          bundle exec fastlane release \
+            changelog:"Production release v${{ steps.semantic_release.outputs.NEW_VERSION }}"
+
+      - name: Extract changelog for this version
+        if: steps.semantic_release.outputs.SKIP_DEPLOY != 'true'
+        id: changelog
+        run: |
+          if [ -f CHANGELOG.md ]; then
+            # Extract the section for this version from CHANGELOG.md
+            VERSION="${{ steps.semantic_release.outputs.NEW_VERSION }}"
+            CHANGELOG=$(sed -n "/## \[$VERSION\]/,/## \[/p" CHANGELOG.md | sed '$ d' || echo "See CHANGELOG.md for details")
+            echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
+            echo "$CHANGELOG" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "CHANGELOG=See commit history for details" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Update GitHub Release with changelog
+        if: steps.semantic_release.outputs.SKIP_DEPLOY != 'true'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.semantic_release.outputs.NEW_VERSION }}
+          name: Release v${{ steps.semantic_release.outputs.NEW_VERSION }}
+          body: ${{ steps.changelog.outputs.CHANGELOG }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Notify release completion
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ] && [ "${{ steps.semantic_release.outputs.SKIP_DEPLOY }}" != "true" ]; then
+            echo "✅ Production release v${{ steps.semantic_release.outputs.NEW_VERSION }} completed"
+            echo "📱 Deployed to TestFlight (Production track)"
+            echo "🎉 GitHub Release created with changelog"
+          elif [ "${{ steps.semantic_release.outputs.SKIP_DEPLOY }}" == "true" ]; then
+            echo "ℹ️ No new version to release (no significant commits since last release)"
+          else
+            echo "❌ Production release failed"
+          fi

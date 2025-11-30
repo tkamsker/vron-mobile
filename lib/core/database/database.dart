@@ -9,13 +9,20 @@ part 'database.g.dart';
 /// Projects table - Real estate properties
 class Projects extends Table {
   TextColumn get id => text()();
-  TextColumn get name => text().withLength(min: 1, max: 255)();
-  TextColumn get description => text().nullable()();
-  TextColumn get status =>
-      text().withDefault(const Constant('active'))();
-  TextColumn get thumbnailUrl => text().nullable()();
-  DateTimeColumn get createdAt => dateTime()();
-  DateTimeColumn get updatedAt => dateTime()();
+  TextColumn get slug => text()();
+  TextColumn get name => text().withLength(min: 1, max: 500)();
+  TextColumn get imageUrl => text().nullable()();
+  BoolColumn get isLive => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get liveDate => dateTime().nullable()();
+
+  // Subscription fields (flattened for simplicity)
+  TextColumn get subscriptionStatus => text().nullable()();
+  BoolColumn get subscriptionIsTrial => boolean().withDefault(const Constant(false))();
+  BoolColumn get subscriptionIsActive => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get subscriptionStartedAt => dateTime().nullable()();
+  DateTimeColumn get subscriptionExpiresAt => dateTime().nullable()();
+  DateTimeColumn get subscriptionRenewsAt => dateTime().nullable()();
+
   DateTimeColumn get syncedAt => dateTime().nullable()();
 
   @override

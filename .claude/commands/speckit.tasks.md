@@ -135,3 +135,94 @@ Every task MUST strictly follow this format:
   - Within each story: Tests (if requested) → Models → Services → Endpoints → Integration
   - Each phase should be a complete, independently testable increment
 - **Final Phase**: Polish & Cross-Cutting Concerns
+
+## Git Workflow & Release Process
+
+**IMPORTANT**: After completing each user story, follow this workflow to prepare for release.
+
+### Conventional Commits (REQUIRED)
+
+All commits MUST follow [Conventional Commits](https://www.conventionalcommits.org/) format:
+
+```
+<type>[optional scope]: <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+**Commit Types**:
+- `feat:` - New feature (triggers MINOR version bump)
+- `fix:` - Bug fix (triggers PATCH version bump)
+- `docs:` - Documentation changes
+- `style:` - Code style changes (formatting, etc.)
+- `refactor:` - Code refactoring
+- `perf:` - Performance improvements
+- `test:` - Adding or updating tests
+- `build:` - Build system or dependencies changes
+- `ci:` - CI/CD configuration changes
+- `chore:` - Other changes (maintenance, etc.)
+
+**Breaking Changes**: Add `!` after type or `BREAKING CHANGE:` in footer for MAJOR version bumps.
+
+**Examples**:
+```bash
+git commit -m "feat(auth): add user login functionality"
+git commit -m "fix(auth): resolve token expiration issue"
+git commit -m "feat(api)!: redesign GraphQL schema"
+```
+
+### User Story Completion Workflow
+
+After completing a user story (all tasks marked [X]):
+
+1. **Ensure proper commit messages**: Review all commits follow conventional format
+2. **Create summary commit** (if needed):
+   ```bash
+   git commit -m "feat(US1): complete user authentication
+
+   - Email/password login
+   - Token management
+   - Offline auth state restoration
+   - User profile caching
+
+   Closes #US1"
+   ```
+
+3. **Push to dev branch**:
+   ```bash
+   git push origin feature/US1-feature-name
+   ```
+
+4. **Create Pull Request to dev**:
+   ```bash
+   gh pr create --base dev --title "feat(US1): Feature Name" \
+     --body "Completes User Story 1 - Feature description"
+   ```
+
+5. **After PR merge, dev → stage → main**:
+   - Dev branch: Continuous deployment to TestFlight (development track)
+   - Stage branch: Merge dev when ready for beta testing
+   - Main branch: Merge stage for production release (creates GitHub release)
+
+### Branch Strategy
+
+- **feature/*** → **dev** → **stage** → **main**
+- Dev: Development builds (TestFlight development track)
+- Stage: Beta builds (TestFlight staging track)
+- Main: Production releases (GitHub Release + TestFlight production)
+
+See `docs/git-workflow.md` for complete workflow documentation.
+
+### Task Generation Impact
+
+When generating tasks, include final tasks for each user story:
+
+```text
+- [ ] TXXX [USn] Review and ensure all commits follow conventional format
+- [ ] TXXX [USn] Create summary commit for user story completion
+- [ ] TXXX [USn] Push feature branch and create PR to dev
+```
+
+These tasks ensure proper release notes generation and semantic versioning.
