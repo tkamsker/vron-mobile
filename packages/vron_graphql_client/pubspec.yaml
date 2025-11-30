@@ -1,0 +1,25 @@
+name: vron_graphql_client
+description: GraphQL client package for vron.one API integration
+version: 1.0.0
+publish_to: none
+
+environment:
+  sdk: ^3.10.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  graphql_flutter: ^5.1.0
+  flutter_riverpod: ^2.4.0
+  hive: ^2.2.3
+  flutter_secure_storage: ^9.0.0
+  uuid: ^3.0.7
+  logger: ^2.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  mockito: ^5.4.0
+  build_runner: ^2.4.0
+
+flutter:

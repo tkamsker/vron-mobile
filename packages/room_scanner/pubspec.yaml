@@ -1,0 +1,27 @@
+name: room_scanner
+description: Platform channel package for LiDAR room scanning (iOS RoomPlan, Android ARCore)
+version: 1.0.0
+publish_to: none
+
+environment:
+  sdk: ^3.10.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  plugin_platform_interface: ^2.1.8
+  logger: ^2.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  mockito: ^5.4.0
+
+flutter:
+  plugin:
+    platforms:
+      ios:
+        pluginClass: RoomScannerPlugin
+      android:
+        package: one.vron.room_scanner
+        pluginClass: RoomScannerPlugin
