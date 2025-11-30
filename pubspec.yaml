@@ -64,6 +64,17 @@ dependencies:
 
   cupertino_icons: ^1.0.8
 
+  # Local Packages
+  vron_graphql_client:
+    path: packages/vron_graphql_client
+  # Platform-specific packages (will be enabled when implementing platform channels T027-T032)
+  # room_scanner:
+  #   path: packages/room_scanner
+  # asset_converter:
+  #   path: packages/asset_converter
+  # vron_3d_viewer:
+  #   path: packages/vron_3d_viewer
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
