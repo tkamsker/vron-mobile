@@ -21,10 +21,10 @@ Future<void> main() async {
   // Initialize Hive for local caching
   await Hive.initFlutter();
 
-  // Open required Hive boxes
-  await Hive.openBox('graphqlCache');
-  await Hive.openBox('auth');
-  await Hive.openBox('cache');
+  // Open required Hive boxes with correct types
+  await Hive.openBox<Map<dynamic, dynamic>?>('graphqlCache'); // For GraphQL cache
+  await Hive.openBox('auth'); // For auth tokens
+  await Hive.openBox('cache'); // For general cache
 
   runApp(
     const ProviderScope(

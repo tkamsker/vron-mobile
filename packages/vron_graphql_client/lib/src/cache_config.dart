@@ -1,4 +1,5 @@
 import 'package:graphql_flutter/graphql_flutter.dart';
+import 'package:hive/hive.dart';
 
 /// Creates GraphQL cache with Hive store for offline persistence
 ///
@@ -9,7 +10,9 @@ import 'package:graphql_flutter/graphql_flutter.dart';
 /// - Normalized cache for efficient storage
 GraphQLCache createGraphQLCache() {
   // Use Hive for persistent cache storage
-  final store = HiveStore();
+  // Get the box that was opened with correct type in main.dart
+  final box = Hive.box<Map<dynamic, dynamic>?>('graphqlCache');
+  final store = HiveStore(box);
 
   return GraphQLCache(
     store: store,
