@@ -328,9 +328,9 @@ Flutter project structure per plan.md:
 
 > **TDD REQUIREMENT: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T150 [P] [US4] Unit test for navmesh generation logic in test/packages/asset_converter/navmesh_generator_test.dart
-- [ ] T151 [P] [US4] Unit test for upload queue with retry strategy in test/core/upload/upload_queue_test.dart
-- [ ] T152 [P] [US4] Unit test for resumable upload with byte offset tracking in test/core/upload/resumable_upload_test.dart
+- [X] T150 [P] [US4] Unit test for navmesh generation logic in test/packages/asset_converter/navmesh_generator_test.dart
+- [X] T151 [P] [US4] Unit test for upload queue with retry strategy in test/core/upload/upload_queue_test.dart
+- [X] T152 [P] [US4] Unit test for resumable upload with byte offset tracking in test/core/upload/resumable_upload_test.dart
 - [ ] T153 [P] [US4] Widget test for upload progress UI in test/widget_test/features/upload/upload_progress_test.dart
 - [ ] T154 [US4] Integration test for complete upload flow with mock S3 in test/integration_test/upload_flow_test.dart
 - [ ] T155 [US4] Integration test for platform channel: generateNavmesh_v1 in test/integration_test/navmesh_generation_test.dart
