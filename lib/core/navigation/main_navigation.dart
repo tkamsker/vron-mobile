@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../features/projects/screens/projects_list_screen.dart';
+import '../../features/scan/screens/scan_screen.dart';
 import '../auth/auth_notifier.dart';
 
 /// Main navigation screen with bottom navigation bar
@@ -120,40 +121,196 @@ class _HomeScreen extends StatelessWidget {
   }
 }
 
-/// AR/3D screen placeholder
-class _ARScreen extends StatelessWidget {
+/// AR/3D screen with scan functionality
+class _ARScreen extends ConsumerWidget {
   const _ARScreen();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final authState = ref.watch(authNotifierProvider);
+    final isGuest = !authState.isAuthenticated;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('AR/3D'),
+        title: const Text('AR/3D Scanning'),
       ),
-      body: Center(
+      body: Padding(
+        padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.view_in_ar_outlined,
-              size: 80,
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+              Icons.view_in_ar,
+              size: 120,
+              color: theme.colorScheme.primary,
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
             Text(
-              'AR Scanning & 3D',
-              style: Theme.of(context).textTheme.headlineMedium,
+              'Room Scanning',
+              style: theme.textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             Text(
-              'Coming soon',
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+              'Scan rooms using LiDAR and create 3D models',
+              style: theme.textTheme.bodyLarge?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 48),
+
+            // Start scan button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => ScanScreen(guestMode: isGuest),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.play_arrow, size: 28),
+                label: const Text(
+                  'Start Room Scan',
+                  style: TextStyle(fontSize: 18),
+                ),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
                   ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Guest mode info
+            if (isGuest)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.orange.shade200,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      color: Colors.orange.shade700,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Guest Mode: Scans are saved locally only. Sign in to sync to cloud.',
+                        style: TextStyle(
+                          color: Colors.orange.shade900,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            const SizedBox(height: 32),
+
+            // Features list
+            _FeatureItem(
+              icon: Icons.camera_alt_outlined,
+              title: 'LiDAR Scanning',
+              description: 'High-precision room measurement',
+            ),
+            const SizedBox(height: 16),
+            _FeatureItem(
+              icon: Icons.threed_rotation,
+              title: '3D Model Generation',
+              description: 'Automatic 3D reconstruction',
+            ),
+            const SizedBox(height: 16),
+            _FeatureItem(
+              icon: Icons.cloud_upload_outlined,
+              title: 'Cloud Sync',
+              description: isGuest
+                  ? 'Sign in to enable cloud storage'
+                  : 'Automatic cloud backup',
+              disabled: isGuest,
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Feature item widget
+class _FeatureItem extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String description;
+  final bool disabled;
+
+  const _FeatureItem({
+    required this.icon,
+    required this.title,
+    required this.description,
+    this.disabled = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final opacity = disabled ? 0.5 : 1.0;
+
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.primary.withOpacity(0.1 * opacity),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(
+            icon,
+            color: theme.colorScheme.primary.withOpacity(opacity),
+            size: 24,
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: disabled
+                      ? theme.colorScheme.onSurface.withOpacity(0.5)
+                      : null,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                description,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: disabled
+                      ? theme.colorScheme.onSurfaceVariant.withOpacity(0.5)
+                      : theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

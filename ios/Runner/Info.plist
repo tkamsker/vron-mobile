@@ -45,5 +45,7 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>VRON Mobile needs camera access to scan rooms using LiDAR and create 3D models.</string>
 </dict>
 </plist>

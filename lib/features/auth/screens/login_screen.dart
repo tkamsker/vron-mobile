@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:vron_mobile/core/auth/auth_notifier.dart';
+import 'package:vron_mobile/features/scan/screens/scan_screen.dart';
 
 /// Login screen matching Vron_hero.jpg design
 ///
@@ -70,12 +72,34 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   void _handleGuestMode() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Guest mode coming soon'),
-        duration: Duration(seconds: 2),
+    // Navigate directly to LiDAR scan screen in guest mode
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (context) => const ScanScreen(
+          guestMode: true,
+          projectName: 'Guest Scan',
+        ),
       ),
     );
+  }
+
+  Future<void> _launchForgotPassword() async {
+    // Default to English, could be enhanced to use device language
+    const language = 'en'; // Options: 'en', 'de', 'pt'
+    final url = Uri.parse('https://app.vron.stage.motorenflug.at/$language/auth/forgot-password');
+
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not open forgot password page'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -305,9 +329,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             ),
                           ),
                           TextButton(
-                            onPressed: () {
-                              Navigator.pushNamed(context, '/forgot-password');
-                            },
+                            onPressed: _launchForgotPassword,
                             style: TextButton.styleFrom(
                               padding: EdgeInsets.zero,
                               minimumSize: const Size(0, 0),
@@ -552,9 +574,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 // Forgot Password link at bottom
                 Center(
                   child: TextButton(
-                    onPressed: () {
-                      Navigator.pushNamed(context, '/forgot-password');
-                    },
+                    onPressed: _launchForgotPassword,
                     child: Text(
                       'Forgot Password?',
                       style: TextStyle(

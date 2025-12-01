@@ -1,0 +1,817 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:io' show Platform;
+import 'package:uuid/uuid.dart';
+import '../models/scan_data.dart';
+import '../services/room_scanner_platform.dart';
+import 'scan_preview_screen.dart';
+
+/// LiDAR Scan screen with simulated scanning
+///
+/// Provides LiDAR scanning UI matching the design from Vron_Lidar1.jpg
+/// Ready for real RoomPlan integration when needed
+class ScanScreen extends ConsumerStatefulWidget {
+  final bool guestMode;
+  final String? projectName;
+
+  const ScanScreen({
+    Key? key,
+    this.guestMode = false,
+    this.projectName,
+  }) : super(key: key);
+
+  @override
+  ConsumerState<ScanScreen> createState() => _ScanScreenState();
+}
+
+class _ScanScreenState extends ConsumerState<ScanScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  final _roomScanner = RoomScannerPlatform();
+  bool _isScanning = false;
+  bool _isLidarAvailable = false;
+  bool _isCheckingLidar = true;
+  double _scanProgress = 0.0;
+  String _scanStatus = 'Ready to scan';
+  int _pointsCollected = 0;
+  String _scanInstruction = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _checkLidarAvailability();
+    _listenToScanEvents();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  /// Check if LiDAR is available on this device
+  Future<void> _checkLidarAvailability() async {
+    if (!Platform.isIOS) {
+      setState(() {
+        _isLidarAvailable = false;
+        _isCheckingLidar = false;
+      });
+      return;
+    }
+
+    final available = await _roomScanner.isRoomPlanAvailable();
+
+    if (!mounted) return;
+
+    setState(() {
+      _isLidarAvailable = available;
+      _isCheckingLidar = false;
+    });
+  }
+
+  /// Listen to scan events from native platform
+  void _listenToScanEvents() {
+    _roomScanner.getScanEventStream().listen((event) {
+      if (!mounted) return;
+
+      switch (event.type) {
+        case RoomScanEventType.started:
+          setState(() {
+            _isScanning = true;
+            _scanStatus = 'Scanning...';
+          });
+          break;
+
+        case RoomScanEventType.progress:
+          setState(() {
+            _scanInstruction = event.data['instruction'] as String? ?? '';
+          });
+          break;
+
+        case RoomScanEventType.pointsUpdated:
+          setState(() {
+            _pointsCollected = event.pointCount;
+            _scanProgress = event.progress;
+          });
+          break;
+
+        case RoomScanEventType.completed:
+          setState(() {
+            _isScanning = false;
+            _scanStatus = 'Scan complete';
+            _scanProgress = 1.0;
+          });
+          break;
+
+        case RoomScanEventType.error:
+          setState(() {
+            _isScanning = false;
+            _scanStatus = 'Error: ${event.error}';
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Scan error: ${event.error}')),
+          );
+          break;
+
+        case RoomScanEventType.canceled:
+          setState(() {
+            _isScanning = false;
+            _scanStatus = 'Scan canceled';
+          });
+          break;
+
+        default:
+          break;
+      }
+    });
+  }
+
+  Future<void> _startScanning() async {
+    if (!_isLidarAvailable) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('LiDAR is not available on this device'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    final started = await _roomScanner.startScanning();
+    if (!started) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to start scanning')),
+        );
+      }
+    }
+  }
+
+  Future<void> _stopScanning() async {
+    final result = await _roomScanner.stopScanning();
+    if (result != null && mounted) {
+      // Handle scan result
+      _handleScanResult(result);
+    }
+  }
+
+  void _handleScanResult(RoomScanResult result) {
+    // Create scan data object
+    final scanData = ScanData(
+      id: result.scanId,
+      projectId: widget.projectName,
+      startedAt: DateTime.now().subtract(Duration(seconds: result.duration.toInt())),
+      completedAt: DateTime.now(),
+      pointsCollected: result.pointCount,
+      durationSeconds: result.duration,
+      isGuestMode: widget.guestMode,
+      status: ScanStatus.completed,
+    );
+
+    // Navigate to preview screen
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ScanPreviewScreen(scanData: scanData),
+      ),
+    );
+  }
+
+  void _saveScan() {
+    // Stop scanning will automatically call _handleScanResult
+    _stopScanning();
+  }
+
+  void _resetScan() {
+    setState(() {
+      _isScanning = false;
+      _scanProgress = 0.0;
+      _pointsCollected = 0;
+      _scanStatus = 'Ready to scan';
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Scaffold(
+      backgroundColor: Colors.grey.shade50,
+      appBar: AppBar(
+        backgroundColor: Colors.grey.shade50,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'LiDAR Scan',
+              style: TextStyle(
+                color: Colors.black87,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            Text(
+              '${widget.projectName ?? "Marketing Analytics"} • Room layout',
+              style: TextStyle(
+                color: Colors.grey.shade600,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+      ),
+      body: _isCheckingLidar
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Status indicator
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const SizedBox.shrink(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            _scanStatus,
+                            style: TextStyle(
+                              color: Colors.blue.shade700,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // Tabs
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: TabBar(
+                        controller: _tabController,
+                        indicator: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        indicatorSize: TabBarIndicatorSize.tab,
+                        labelColor: Colors.blue.shade700,
+                        unselectedLabelColor: Colors.blue.shade300,
+                        dividerColor: Colors.transparent,
+                        labelStyle: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        tabs: const [
+                          Tab(text: 'Live LiDAR preview'),
+                          Tab(text: 'Depth + mesh'),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // Camera preview / Scan view
+                    Container(
+                      height: 400,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0D3B4F),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: Stack(
+                          children: [
+                            // Camera placeholder
+                            _buildCameraPlaceholder(),
+
+                            // Crosshair overlay
+                            if (!_isScanning)
+                              Center(
+                                child: CustomPaint(
+                                  size: const Size(200, 200),
+                                  painter: CrosshairPainter(),
+                                ),
+                              ),
+
+                            // Scanning animation
+                            if (_isScanning)
+                              AnimatedBuilder(
+                                animation: AlwaysStoppedAnimation(_scanProgress),
+                                builder: (context, child) {
+                                  return CustomPaint(
+                                    size: Size.infinite,
+                                    painter: ScanningOverlayPainter(progress: _scanProgress),
+                                  );
+                                },
+                              ),
+
+                            // Instructions overlay
+                            if (_isScanning)
+                              Positioned(
+                                bottom: 40,
+                                left: 20,
+                                right: 20,
+                                child: Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.7),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Text(
+                                    'Point at walls and slowly move around\nKeep the room edges inside the frame',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 14,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // Scanning coverage
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Scanning coverage',
+                          style: TextStyle(
+                            color: Colors.blue.shade400,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          '${(_scanProgress * 100).toInt()}%',
+                          style: TextStyle(
+                            color: Colors.blue.shade400,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: LinearProgressIndicator(
+                        value: _scanProgress,
+                        backgroundColor: Colors.blue.shade100,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Colors.blue.shade400,
+                        ),
+                        minHeight: 8,
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // Control buttons
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // Reset button (shown when there's progress)
+                        if (_scanProgress > 0 && !_isScanning)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 12),
+                            child: ElevatedButton.icon(
+                              onPressed: _resetScan,
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Reset'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.grey.shade600,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 24,
+                                  vertical: 16,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30),
+                                ),
+                                elevation: 0,
+                              ),
+                            ),
+                          ),
+
+                        // Start/Stop button
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: _isLidarAvailable
+                                ? (_isScanning ? _stopScanning : _startScanning)
+                                : null,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _isScanning
+                                  ? Colors.red.shade400
+                                  : Colors.blue.shade600,
+                              disabledBackgroundColor: Colors.grey.shade300,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 18),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  _isScanning ? Icons.stop : Icons.play_arrow,
+                                  size: 24,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _isScanning ? 'Stop scanning' : 'Start scanning',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        // Save button (shown when scan is complete)
+                        if (_scanProgress >= 1.0 && !_isScanning)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 12),
+                            child: ElevatedButton.icon(
+                              onPressed: _saveScan,
+                              icon: const Icon(Icons.save),
+                              label: const Text('Save'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green.shade600,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 24,
+                                  vertical: 16,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30),
+                                ),
+                                elevation: 0,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // Instructions
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Move slowly and keep your device pointed at surfaces.',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            showDialog(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: const Text('Scanning Tips'),
+                                content: const Text(
+                                  '• Hold your device at eye level\n'
+                                  '• Move slowly around the room\n'
+                                  '• Point at walls and corners\n'
+                                  '• Keep room edges in frame\n'
+                                  '• Ensure good lighting',
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context),
+                                    child: const Text('Got it'),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                          child: Text(
+                            'View tips',
+                            style: TextStyle(
+                              color: Colors.blue.shade600,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    // LiDAR availability warning
+                    if (!_isLidarAvailable) ...[
+                      const SizedBox(height: 24),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.orange.shade200,
+                          ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              Icons.warning_amber_rounded,
+                              color: Colors.orange.shade700,
+                              size: 24,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'LiDAR not available on this device',
+                                    style: TextStyle(
+                                      color: Colors.orange.shade900,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'On devices without a LiDAR sensor, the LiDAR scan button will be disabled. You can still browse projects and products normally.',
+                                    style: TextStyle(
+                                      color: Colors.orange.shade800,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 18),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                        child: const Text(
+                          'LiDAR scanning disabled',
+                          style: TextStyle(
+                            color: Colors.grey,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+    );
+  }
+
+  Widget _buildCameraPlaceholder() {
+    if (!Platform.isIOS || !_isLidarAvailable) {
+      return Container(
+        color: const Color(0xFF0D3B4F),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.videocam_outlined,
+                size: 80,
+                color: Colors.white.withOpacity(0.3),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'RoomPlan not available',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.7),
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Use UiKitView to embed the native RoomCaptureView
+    return Stack(
+      children: [
+        UiKitView(
+          viewType: 'com.vron.mobile/room_plan_view',
+          creationParamsCodec: const StandardMessageCodec(),
+        ),
+        // Show scanning instruction overlay
+        if (_scanInstruction.isNotEmpty)
+          Positioned(
+            bottom: 40,
+            left: 20,
+            right: 20,
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.7),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                _scanInstruction,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// Custom painter for crosshair overlay
+class CrosshairPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withOpacity(0.8)
+      ..strokeWidth = 2
+      ..style = PaintingStyle.stroke;
+
+    final centerX = size.width / 2;
+    final centerY = size.height / 2;
+    final gridSize = 60.0;
+
+    // Vertical lines
+    canvas.drawLine(
+      Offset(centerX - gridSize, 0),
+      Offset(centerX - gridSize, size.height),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(centerX, 0),
+      Offset(centerX, size.height),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(centerX + gridSize, 0),
+      Offset(centerX + gridSize, size.height),
+      paint,
+    );
+
+    // Horizontal lines
+    canvas.drawLine(
+      Offset(0, centerY - gridSize),
+      Offset(size.width, centerY - gridSize),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(0, centerY),
+      Offset(size.width, centerY),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(0, centerY + gridSize),
+      Offset(size.width, centerY + gridSize),
+      paint,
+    );
+
+    // Center circle
+    final circlePaint = Paint()
+      ..color = Colors.blue.withOpacity(0.6)
+      ..style = PaintingStyle.fill;
+
+    canvas.drawCircle(
+      Offset(centerX, centerY),
+      40,
+      circlePaint,
+    );
+
+    // Center icon (simplified target)
+    final iconPaint = Paint()
+      ..color = Colors.white
+      ..strokeWidth = 3
+      ..style = PaintingStyle.stroke;
+
+    canvas.drawCircle(
+      Offset(centerX, centerY),
+      15,
+      iconPaint,
+    );
+
+    // Corner brackets
+    final cornerLength = 20.0;
+    final corners = [
+      // Top-left
+      [Offset(10, 10), Offset(10 + cornerLength, 10)],
+      [Offset(10, 10), Offset(10, 10 + cornerLength)],
+      // Top-right
+      [Offset(size.width - 10, 10), Offset(size.width - 10 - cornerLength, 10)],
+      [Offset(size.width - 10, 10), Offset(size.width - 10, 10 + cornerLength)],
+      // Bottom-left
+      [Offset(10, size.height - 10), Offset(10 + cornerLength, size.height - 10)],
+      [Offset(10, size.height - 10), Offset(10, size.height - 10 - cornerLength)],
+      // Bottom-right
+      [Offset(size.width - 10, size.height - 10), Offset(size.width - 10 - cornerLength, size.height - 10)],
+      [Offset(size.width - 10, size.height - 10), Offset(size.width - 10, size.height - 10 - cornerLength)],
+    ];
+
+    for (final corner in corners) {
+      canvas.drawLine(corner[0], corner[1], paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(CustomPainter oldDelegate) => false;
+}
+
+/// Custom painter for scanning overlay animation
+class ScanningOverlayPainter extends CustomPainter {
+  final double progress;
+
+  ScanningOverlayPainter({required this.progress});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Green border indicating active scanning
+    final borderPaint = Paint()
+      ..color = Colors.green.withOpacity(0.6)
+      ..strokeWidth = 3
+      ..style = PaintingStyle.stroke;
+
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, size.width, size.height),
+      borderPaint,
+    );
+
+    // Animated scan line
+    final scanY = size.height * progress;
+    final scanLinePaint = Paint()
+      ..color = Colors.green
+      ..strokeWidth = 2;
+
+    canvas.drawLine(
+      Offset(0, scanY),
+      Offset(size.width, scanY),
+      scanLinePaint,
+    );
+
+    // Gradient overlay to show scanned area
+    final gradient = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          Colors.green.withOpacity(0.1),
+          Colors.transparent,
+        ],
+        stops: [progress, progress],
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, size.width, size.height),
+      gradient,
+    );
+  }
+
+  @override
+  bool shouldRepaint(ScanningOverlayPainter oldDelegate) {
+    return oldDelegate.progress != progress;
+  }
+}
