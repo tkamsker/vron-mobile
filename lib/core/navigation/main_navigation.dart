@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../features/projects/screens/projects_list_screen.dart';
 import '../../features/scan/screens/scan_screen.dart';
+import '../../features/scan/screens/scan_sessions_screen.dart';
 import '../auth/auth_notifier.dart';
 
 /// Main navigation screen with bottom navigation bar
@@ -12,22 +13,37 @@ import '../auth/auth_notifier.dart';
 /// - AR/3D: AR scanning and 3D visualization
 /// - Profile: User profile and settings
 class MainNavigationScreen extends ConsumerStatefulWidget {
-  const MainNavigationScreen({super.key});
+  final int initialIndex;
+
+  const MainNavigationScreen({super.key, this.initialIndex = 0});
 
   @override
   ConsumerState<MainNavigationScreen> createState() => _MainNavigationScreenState();
 }
 
 class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
-  int _currentIndex = 1; // Start on Projects tab
+  late int _currentIndex;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _currentIndex = widget.initialIndex; // Use the provided initial index
+
+    // Initialize screens with ScanSessionsScreen that shows all sessions
+    _screens = [
+      const ScanSessionsScreen(
+        projectId: null, // Show all sessions, not filtered by project
+        projectName: 'All Sessions',
+      ),
+      const ProjectsListScreen(),
+      const _ARScreen(),
+      const _ProfileScreen(),
+    ];
+  }
 
   // Navigation screens
-  static const List<Widget> _screens = [
-    _HomeScreen(),
-    ProjectsListScreen(),
-    _ARScreen(),
-    _ProfileScreen(),
-  ];
+  late final List<Widget> _screens;
 
   @override
   Widget build(BuildContext context) {
@@ -44,9 +60,9 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
         },
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Home',
+            icon: Icon(Icons.grid_view_outlined),
+            selectedIcon: Icon(Icons.grid_view),
+            label: 'Sessions',
           ),
           NavigationDestination(
             icon: Icon(Icons.folder_outlined),
@@ -56,7 +72,7 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
           NavigationDestination(
             icon: Icon(Icons.view_in_ar_outlined),
             selectedIcon: Icon(Icons.view_in_ar),
-            label: 'AR/3D',
+            label: 'Scan',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),
@@ -65,58 +81,34 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
           ),
         ],
       ),
-      floatingActionButton: _currentIndex == 1
+      floatingActionButton: _currentIndex == 0
           ? FloatingActionButton(
               onPressed: () {
-                // TODO: Implement create new project
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Create new project - Coming soon'),
-                    duration: Duration(seconds: 2),
+                // Navigate to scan screen to start a new session
+                final authState = ref.read(authNotifierProvider);
+                final isGuest = !authState.isAuthenticated;
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => ScanScreen(guestMode: isGuest),
                   ),
                 );
               },
               child: const Icon(Icons.add),
             )
-          : null,
-    );
-  }
-}
-
-/// Home screen placeholder
-class _HomeScreen extends StatelessWidget {
-  const _HomeScreen();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Home'),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.home_outlined,
-              size: 80,
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Dashboard',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Coming soon',
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-            ),
-          ],
-        ),
-      ),
+          : _currentIndex == 1
+              ? FloatingActionButton(
+                  onPressed: () {
+                    // TODO: Implement create new project
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Create new project - Coming soon'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                  child: const Icon(Icons.add),
+                )
+              : null,
     );
   }
 }

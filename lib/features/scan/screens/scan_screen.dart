@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:async';
-import 'dart:io' show Platform;
+import 'dart:io' show Platform, File, Directory;
+import 'dart:ui' as ui;
+import 'dart:math' as math;
 import 'package:uuid/uuid.dart';
 import 'package:roomplan_flutter/roomplan_flutter.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
 import '../models/scan_data.dart';
-import '../repositories/scan_repository_provider.dart';
-import 'scan_preview_screen.dart';
+import 'scan_complete_screen.dart';
 
 /// LiDAR Scan screen with simulated scanning
 ///
@@ -191,6 +195,9 @@ class _ScanScreenState extends ConsumerState<ScanScreen>
     print('Room dimensions: ${result.room.dimensions}');
     print('Project: ${widget.projectName}, Guest mode: ${widget.guestMode}');
 
+    // Generate thumbnail from scan result
+    final thumbnailPath = await _generateThumbnailFromScanResult(result);
+
     // Create scan data object
     // If no project ID is provided, treat as guest scan
     final effectiveGuestMode = widget.guestMode || widget.projectName == null;
@@ -220,12 +227,171 @@ class _ScanScreenState extends ConsumerState<ScanScreen>
       ),
     );
 
-    // Navigate to preview screen (user will save from there)
+    // Navigate to scan complete screen with detailed metrics and thumbnail
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => ScanPreviewScreen(scanData: scanData),
+        builder: (context) => ScanCompleteScreen(
+          scanData: scanData,
+          thumbnailPath: thumbnailPath,
+        ),
       ),
     );
+  }
+
+  /// Generate a thumbnail image from the scan result
+  ///
+  /// Creates a 2D floor plan representation based on the room's walls
+  /// and saves it as a PNG file
+  Future<String?> _generateThumbnailFromScanResult(ScanResult result) async {
+    try {
+      // Create a 2D floor plan painter from the scan result
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder);
+      const size = Size(400, 400);
+
+      // Draw the floor plan
+      final paint = Paint()
+        ..color = const Color(0xFFF5F1E8)
+        ..style = PaintingStyle.fill;
+
+      // Background
+      canvas.drawRect(Offset.zero & size, paint);
+
+      // Calculate bounds from walls to fit in the canvas
+      if (result.room.walls.isNotEmpty) {
+        // Extract wall positions to calculate bounds
+        double minX = double.infinity;
+        double maxX = double.negativeInfinity;
+        double minZ = double.infinity;
+        double maxZ = double.negativeInfinity;
+
+        for (final wall in result.room.walls) {
+          final transform = wall.transform;
+          if (transform == null) continue;
+
+          final x = transform[12]; // Translation X
+          final z = transform[14]; // Translation Z
+
+          minX = math.min(minX, x);
+          maxX = math.max(maxX, x);
+          minZ = math.min(minZ, z);
+          maxZ = math.max(maxZ, z);
+        }
+
+        final roomWidth = maxX - minX;
+        final roomDepth = maxZ - minZ;
+        final scale = math.min(350 / roomWidth, 350 / roomDepth);
+        final centerX = size.width / 2;
+        final centerY = size.height / 2;
+
+        // Draw walls
+        final wallPaint = Paint()
+          ..color = Colors.grey.shade700
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 4;
+
+        for (final wall in result.room.walls) {
+          final transform = wall.transform;
+          final dimensions = wall.dimensions;
+          if (transform == null || dimensions == null) continue;
+
+          final x = transform[12];
+          final z = transform[14];
+          final width = dimensions.width;
+
+          final screenX = centerX + (x - minX - roomWidth / 2) * scale;
+          final screenY = centerY + (z - minZ - roomDepth / 2) * scale;
+          final screenWidth = width * scale;
+
+          // Draw wall as a line
+          canvas.drawLine(
+            Offset(screenX - screenWidth / 2, screenY),
+            Offset(screenX + screenWidth / 2, screenY),
+            wallPaint,
+          );
+        }
+
+        // Draw doors
+        final doorPaint = Paint()
+          ..color = Colors.blue.shade400
+          ..style = PaintingStyle.fill;
+
+        for (final door in result.room.doors) {
+          final transform = door.transform;
+          if (transform == null) continue;
+
+          final x = transform[12];
+          final z = transform[14];
+
+          final screenX = centerX + (x - minX - roomWidth / 2) * scale;
+          final screenY = centerY + (z - minZ - roomDepth / 2) * scale;
+
+          // Draw door as a small rectangle
+          canvas.drawRect(
+            Rect.fromCenter(
+              center: Offset(screenX, screenY),
+              width: 30,
+              height: 8,
+            ),
+            doorPaint,
+          );
+        }
+
+        // Draw windows
+        final windowPaint = Paint()
+          ..color = Colors.cyan.shade300
+          ..style = PaintingStyle.fill;
+
+        for (final window in result.room.windows) {
+          final transform = window.transform;
+          if (transform == null) continue;
+
+          final x = transform[12];
+          final z = transform[14];
+
+          final screenX = centerX + (x - minX - roomWidth / 2) * scale;
+          final screenY = centerY + (z - minZ - roomDepth / 2) * scale;
+
+          // Draw window as a small rectangle
+          canvas.drawRect(
+            Rect.fromCenter(
+              center: Offset(screenX, screenY),
+              width: 25,
+              height: 6,
+            ),
+            windowPaint,
+          );
+        }
+      }
+
+      // Convert to image
+      final picture = recorder.endRecording();
+      final image = await picture.toImage(400, 400);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+
+      if (byteData == null) {
+        print('Failed to generate thumbnail: byteData is null');
+        return null;
+      }
+
+      // Save to file
+      final directory = await getApplicationDocumentsDirectory();
+      final thumbnailDir = Directory(p.join(directory.path, 'thumbnails'));
+      if (!await thumbnailDir.exists()) {
+        await thumbnailDir.create(recursive: true);
+      }
+
+      final filename = 'thumbnail_${const Uuid().v4()}.png';
+      final file = File(p.join(thumbnailDir.path, filename));
+      await file.writeAsBytes(byteData.buffer.asUint8List());
+
+      print('Thumbnail saved to: ${file.path}');
+      return file.path;
+    } catch (e, stackTrace) {
+      print('Error generating thumbnail: $e');
+      print(stackTrace);
+      return null;
+    }
   }
 
   void _saveScan() {

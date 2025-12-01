@@ -25,6 +25,7 @@ class ScanRepository {
     String roomName, {
     String? existingSessionId,
     String? sessionName,
+    String? thumbnailPath,
   }) async {
     // Create or get session
     final sessionId = existingSessionId ?? _uuid.v4();
@@ -37,6 +38,7 @@ class ScanRepository {
         projectId: scanData.projectId,
         projectName: scanData.projectName,
         isGuestMode: scanData.isGuestMode,
+        thumbnailPath: thumbnailPath,
       );
     }
 
@@ -54,6 +56,7 @@ class ScanRepository {
     String? projectId,
     String? projectName,
     required bool isGuestMode,
+    String? thumbnailPath,
   }) async {
     final now = DateTime.now();
     final session = ScanSessionsCompanion(
@@ -61,6 +64,7 @@ class ScanRepository {
       name: Value(sessionName),
       projectId: Value(projectId),
       projectName: Value(projectName),
+      thumbnailPath: Value(thumbnailPath),
       isGuestMode: Value(isGuestMode),
       createdAt: Value(now),
       updatedAt: Value(now),

@@ -72,15 +72,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   void _handleGuestMode() {
-    // Navigate directly to LiDAR scan screen in guest mode
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (context) => const ScanScreen(
-          guestMode: true,
-          projectName: 'Guest Scan',
-        ),
-      ),
-    );
+    // Navigate to session list in guest mode
+    Navigator.of(context).pushReplacementNamed('/projects');
   }
 
   Future<void> _launchForgotPassword() async {

@@ -120,6 +120,7 @@ class ScanSessions extends Table {
   TextColumn get name => text()(); // e.g., "Morning Session", "Floor 1 Scan"
   TextColumn get projectId => text().nullable().references(Projects, #id, onDelete: KeyAction.cascade)();
   TextColumn get projectName => text().nullable()(); // Cached project name for display
+  TextColumn get thumbnailPath => text().nullable()(); // Path to thumbnail image for preview
   BoolColumn get isGuestMode => boolean().withDefault(const Constant(false))();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();
@@ -158,7 +159,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration {
@@ -176,6 +177,17 @@ class AppDatabase extends _$AppDatabase {
 
           // Add sessionId column to GuestScans table
           await m.addColumn(guestScans, guestScans.sessionId);
+        }
+        if (from == 2 && to == 3) {
+          // Add thumbnailPath column to ScanSessions table
+          await m.addColumn(scanSessions, scanSessions.thumbnailPath);
+        }
+        // Handle migrations from version 1 to 3
+        if (from == 1 && to == 3) {
+          await m.createTable(scanSessions);
+          await m.addColumn(rooms, rooms.sessionId);
+          await m.addColumn(guestScans, guestScans.sessionId);
+          // thumbnailPath will be included in createTable since it's part of the schema
         }
       },
     );
@@ -207,6 +219,31 @@ class AppDatabase extends _$AppDatabase {
   // Scan session queries
   Stream<List<ScanSession>> watchAllSessions() =>
       (select(scanSessions)..orderBy([(s) => OrderingTerm.desc(s.createdAt)])).watch();
+
+  // Watch only sessions that have scans (not empty)
+  Stream<List<ScanSession>> watchSessionsWithScans() {
+    return customSelect(
+      '''
+      SELECT DISTINCT s.* FROM scan_sessions s
+      LEFT JOIN rooms r ON s.id = r.session_id
+      LEFT JOIN guest_scans g ON s.id = g.session_id
+      WHERE r.id IS NOT NULL OR g.id IS NOT NULL
+      ORDER BY s.created_at DESC
+      ''',
+      readsFrom: {scanSessions, rooms, guestScans},
+    ).watch().map((rows) {
+      return rows.map((row) => ScanSession(
+        id: row.read<String>('id'),
+        name: row.read<String>('name'),
+        projectId: row.readNullable<String>('project_id'),
+        projectName: row.readNullable<String>('project_name'),
+        thumbnailPath: row.readNullable<String>('thumbnail_path'),
+        isGuestMode: row.read<bool>('is_guest_mode'),
+        createdAt: row.read<DateTime>('created_at'),
+        updatedAt: row.read<DateTime>('updated_at'),
+      )).toList();
+    });
+  }
 
   Stream<List<ScanSession>> watchSessionsByProject(String projectId) =>
       (select(scanSessions)

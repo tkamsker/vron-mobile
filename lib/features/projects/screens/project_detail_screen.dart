@@ -1,7 +1,9 @@
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/database.dart';
+import '../../scan/screens/scan_screen.dart';
 
 /// Project detail screen with tabs
 ///
@@ -306,6 +308,35 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
           ),
 
           const SizedBox(height: 24),
+
+          // Add Room Scan button (iOS only)
+          if (Platform.isIOS) ...[
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => ScanScreen(
+                        projectId: widget.project.id,
+                        projectName: widget.project.name,
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.3d_rotation),
+                label: const Text('Add Room Scan'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  backgroundColor: theme.colorScheme.secondary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(50),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
 
           // Shareable link
           Text(

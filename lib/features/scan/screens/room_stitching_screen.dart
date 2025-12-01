@@ -1,5 +1,9 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/navigation/main_navigation.dart' show MainNavigationScreen;
+import '../../projects/screens/projects_list_screen.dart';
+import '../../../core/auth/auth_notifier.dart';
 
 /// Room stitching screen
 ///
@@ -170,14 +174,52 @@ class _RoomStitchingScreenState extends ConsumerState<RoomStitchingScreen> {
           ),
         ],
       ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: 0, // Highlight Sessions since we're viewing a session's stitching
+        onDestinationSelected: (index) {
+          // Navigate back to main navigation with selected tab
+          if (index != 0) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (context) => MainNavigationScreen(initialIndex: index),
+              ),
+            );
+          } else {
+            // Go back to sessions list
+            Navigator.of(context).pop();
+          }
+        },
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.grid_view_outlined),
+            selectedIcon: Icon(Icons.grid_view),
+            label: 'Sessions',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.folder_outlined),
+            selectedIcon: Icon(Icons.folder),
+            label: 'Projects',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.view_in_ar_outlined),
+            selectedIcon: Icon(Icons.view_in_ar),
+            label: 'Scan',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
+            label: 'Profile',
+          ),
+        ],
+      ),
     );
   }
 
   void _handlePanStart(DragStartDetails details) {
     _dragStart = details.localPosition;
 
-    // Select room on tap
-    if (_selectedTool == StitchingTool.select) {
+    // Select room on tap - selecting also enables moving
+    if (_selectedTool == StitchingTool.select || _selectedTool == StitchingTool.move) {
       final room = _findRoomAtPosition(details.localPosition);
       setState(() {
         _selectedRoomId = room?.id;
@@ -188,16 +230,21 @@ class _RoomStitchingScreenState extends ConsumerState<RoomStitchingScreen> {
   void _handlePanUpdate(DragUpdateDetails details) {
     final delta = details.localPosition - _dragStart;
 
-    if (_selectedTool == StitchingTool.move && _selectedRoomId != null) {
+    // Allow moving with both select and move tools
+    if ((_selectedTool == StitchingTool.select || _selectedTool == StitchingTool.move) && _selectedRoomId != null) {
       setState(() {
         final room = widget.rooms.firstWhere((r) => r.id == _selectedRoomId);
+
+        // Update position with delta
         room.position += delta / _gridScale;
-        _dragStart = details.localPosition;
-      });
-    } else if (_selectedTool == StitchingTool.rotate && _selectedRoomId != null) {
-      setState(() {
-        final room = widget.rooms.firstWhere((r) => r.id == _selectedRoomId);
-        room.rotation += delta.dx * 0.01;
+
+        // Snap to grid (20px grid)
+        const gridSize = 20.0;
+        room.position = Offset(
+          (room.position.dx / gridSize).round() * gridSize,
+          (room.position.dy / gridSize).round() * gridSize,
+        );
+
         _dragStart = details.localPosition;
       });
     }
@@ -213,17 +260,58 @@ class _RoomStitchingScreenState extends ConsumerState<RoomStitchingScreen> {
       setState(() {
         _selectedRoomId = room?.id;
       });
+    } else if (_selectedTool == StitchingTool.rotate && _selectedRoomId != null) {
+      // Rotate by 45° (0.7854 radians) per tap
+      setState(() {
+        final room = widget.rooms.firstWhere((r) => r.id == _selectedRoomId);
+        room.rotation += 0.7854; // 45 degrees in radians
+        // Normalize rotation to 0-2π range
+        while (room.rotation >= 6.2832) {
+          room.rotation -= 6.2832; // 2π
+        }
+      });
     } else if (_selectedTool == StitchingTool.addDoor && _selectedRoomId != null) {
-      // Find another room near the tap
-      final targetRoom = _findRoomAtPosition(details.localPosition);
-      if (targetRoom != null && targetRoom.id != _selectedRoomId) {
+      // Add door to wall at tap position
+      final room = widget.rooms.firstWhere((r) => r.id == _selectedRoomId);
+      final roomRect = _getRoomRect(room);
+      final tapPos = details.localPosition;
+
+      // Determine which wall was clicked (with threshold)
+      const wallThreshold = 20.0;
+      String? wall;
+      double position = 0.5;
+
+      // Check if tap is on a wall
+      if ((tapPos.dy - roomRect.top).abs() < wallThreshold) {
+        wall = 'top';
+        position = (tapPos.dx - roomRect.left) / roomRect.width;
+      } else if ((tapPos.dy - roomRect.bottom).abs() < wallThreshold) {
+        wall = 'bottom';
+        position = (tapPos.dx - roomRect.left) / roomRect.width;
+      } else if ((tapPos.dx - roomRect.left).abs() < wallThreshold) {
+        wall = 'left';
+        position = (tapPos.dy - roomRect.top) / roomRect.height;
+      } else if ((tapPos.dx - roomRect.right).abs() < wallThreshold) {
+        wall = 'right';
+        position = (tapPos.dy - roomRect.top) / roomRect.height;
+      }
+
+      if (wall != null && position >= 0 && position <= 1) {
         setState(() {
-          _doors.add(DoorConnection(
-            room1Id: _selectedRoomId!,
-            room2Id: targetRoom.id,
-            position: details.localPosition,
+          room.doorPositions.add(DoorPosition(
+            wall: wall!,
+            position: position.clamp(0.1, 0.9), // Keep doors away from corners
+            width: 30.0,
           ));
         });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Door added to $wall wall'),
+            duration: const Duration(seconds: 1),
+            backgroundColor: Colors.green,
+          ),
+        );
       }
     }
   }
@@ -246,6 +334,36 @@ class _RoomStitchingScreenState extends ConsumerState<RoomStitchingScreen> {
       width: size.width,
       height: size.height,
     );
+  }
+
+  /// Calculate rough outline points for a room (useful for collision detection and visualization)
+  List<Offset> _calculateRoomOutline(RoomData room) {
+    final center = room.position;
+    final halfWidth = room.size.width / 2;
+    final halfHeight = room.size.height / 2;
+
+    // Define the 4 corners in local space (before rotation)
+    final corners = [
+      Offset(-halfWidth, -halfHeight), // Top-left
+      Offset(halfWidth, -halfHeight),  // Top-right
+      Offset(halfWidth, halfHeight),   // Bottom-right
+      Offset(-halfWidth, halfHeight),  // Bottom-left
+    ];
+
+    // Apply rotation and translation
+    final rotatedCorners = corners.map((corner) {
+      // Rotate around origin
+      final rotatedX = corner.dx * cos(room.rotation) - corner.dy * sin(room.rotation);
+      final rotatedY = corner.dx * sin(room.rotation) + corner.dy * cos(room.rotation);
+
+      // Translate to room position
+      return Offset(
+        center.dx + rotatedX,
+        center.dy + rotatedY,
+      );
+    }).toList();
+
+    return rotatedCorners;
   }
 
   void _savePlan() {
@@ -327,9 +445,9 @@ class FloorPlanPainter extends CustomPainter {
     canvas.translate(center.dx, center.dy);
     canvas.rotate(room.rotation);
 
-    // Room background
+    // Room background (floor)
     final fillPaint = Paint()
-      ..color = room.color.withOpacity(0.3)
+      ..color = room.color.withOpacity(0.15)
       ..style = PaintingStyle.fill;
 
     final rect = Rect.fromCenter(
@@ -338,30 +456,77 @@ class FloorPlanPainter extends CustomPainter {
       height: roomSize.height,
     );
 
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(rect, const Radius.circular(8)),
-      fillPaint,
-    );
+    canvas.drawRect(rect, fillPaint);
 
-    // Room border
-    final borderPaint = Paint()
-      ..color = isSelected ? Colors.blue : room.color
-      ..strokeWidth = isSelected ? 3 : 2
-      ..style = PaintingStyle.stroke;
+    // Draw walls with thickness
+    final wallThickness = 6.0;
+    final wallPaint = Paint()
+      ..color = isSelected ? Colors.blue.shade700 : Colors.grey.shade700
+      ..style = PaintingStyle.fill;
 
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(rect, const Radius.circular(8)),
-      borderPaint,
-    );
+    final innerWallPaint = Paint()
+      ..color = isSelected ? Colors.blue.shade400 : Colors.grey.shade500
+      ..style = PaintingStyle.fill;
+
+    // Wall positions
+    final left = rect.left;
+    final right = rect.right;
+    final top = rect.top;
+    final bottom = rect.bottom;
+
+    // Draw walls as thick rectangles
+    // Top wall
+    _drawWallSegment(canvas, Offset(left, top), Offset(right, top), wallThickness, wallPaint, innerWallPaint, room.doorPositions, 'top');
+
+    // Right wall
+    _drawWallSegment(canvas, Offset(right, top), Offset(right, bottom), wallThickness, wallPaint, innerWallPaint, room.doorPositions, 'right');
+
+    // Bottom wall
+    _drawWallSegment(canvas, Offset(right, bottom), Offset(left, bottom), wallThickness, wallPaint, innerWallPaint, room.doorPositions, 'bottom');
+
+    // Left wall
+    _drawWallSegment(canvas, Offset(left, bottom), Offset(left, top), wallThickness, wallPaint, innerWallPaint, room.doorPositions, 'left');
+
+    // Draw corner reinforcements
+    final cornerPaint = Paint()
+      ..color = isSelected ? Colors.blue.shade800 : Colors.grey.shade800
+      ..style = PaintingStyle.fill;
+
+    canvas.drawCircle(Offset(left, top), wallThickness / 1.5, cornerPaint);
+    canvas.drawCircle(Offset(right, top), wallThickness / 1.5, cornerPaint);
+    canvas.drawCircle(Offset(right, bottom), wallThickness / 1.5, cornerPaint);
+    canvas.drawCircle(Offset(left, bottom), wallThickness / 1.5, cornerPaint);
+
+    // Selection indicator
+    if (isSelected) {
+      final selectionPaint = Paint()
+        ..color = Colors.blue.withOpacity(0.2)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3;
+
+      final selectionRect = rect.inflate(12);
+      canvas.drawRect(selectionRect, selectionPaint);
+
+      // Draw corner handles
+      final handlePaint = Paint()
+        ..color = Colors.blue
+        ..style = PaintingStyle.fill;
+
+      canvas.drawCircle(Offset(selectionRect.left, selectionRect.top), 6, handlePaint);
+      canvas.drawCircle(Offset(selectionRect.right, selectionRect.top), 6, handlePaint);
+      canvas.drawCircle(Offset(selectionRect.right, selectionRect.bottom), 6, handlePaint);
+      canvas.drawCircle(Offset(selectionRect.left, selectionRect.bottom), 6, handlePaint);
+    }
 
     // Room label
     final textPainter = TextPainter(
       text: TextSpan(
         text: room.name,
         style: TextStyle(
-          color: room.color.computeLuminance() > 0.5 ? Colors.black : Colors.black87,
+          color: Colors.grey.shade800,
           fontSize: 14,
           fontWeight: FontWeight.w600,
+          backgroundColor: Colors.white.withOpacity(0.9),
         ),
       ),
       textDirection: TextDirection.ltr,
@@ -373,6 +538,144 @@ class FloorPlanPainter extends CustomPainter {
     );
 
     canvas.restore();
+  }
+
+  void _drawWallSegment(
+    Canvas canvas,
+    Offset start,
+    Offset end,
+    double thickness,
+    Paint wallPaint,
+    Paint innerPaint,
+    List<DoorPosition> doors,
+    String wallSide,
+  ) {
+    final isHorizontal = (end.dy - start.dy).abs() < 1;
+    final wallLength = isHorizontal ? (end.dx - start.dx).abs() : (end.dy - start.dy).abs();
+
+    // Find doors on this wall
+    final doorsOnWall = doors.where((d) => d.wall == wallSide).toList();
+
+    if (doorsOnWall.isEmpty) {
+      // Draw solid wall
+      if (isHorizontal) {
+        final rect = Rect.fromLTWH(
+          start.dx < end.dx ? start.dx : end.dx,
+          start.dy - thickness / 2,
+          wallLength,
+          thickness,
+        );
+        canvas.drawRect(rect, wallPaint);
+
+        // Inner highlight
+        final innerRect = Rect.fromLTWH(
+          rect.left,
+          rect.top + thickness * 0.3,
+          rect.width,
+          thickness * 0.4,
+        );
+        canvas.drawRect(innerRect, innerPaint);
+      } else {
+        final rect = Rect.fromLTWH(
+          start.dx - thickness / 2,
+          start.dy < end.dy ? start.dy : end.dy,
+          thickness,
+          wallLength,
+        );
+        canvas.drawRect(rect, wallPaint);
+
+        // Inner highlight
+        final innerRect = Rect.fromLTWH(
+          rect.left + thickness * 0.3,
+          rect.top,
+          thickness * 0.4,
+          rect.height,
+        );
+        canvas.drawRect(innerRect, innerPaint);
+      }
+    } else {
+      // Draw wall with door openings
+      double currentPos = 0;
+
+      for (final door in doorsOnWall) {
+        final doorStart = wallLength * door.position;
+        final doorEnd = doorStart + door.width;
+
+        // Draw wall segment before door
+        if (doorStart > currentPos) {
+          if (isHorizontal) {
+            final rect = Rect.fromLTWH(
+              (start.dx < end.dx ? start.dx : end.dx) + currentPos,
+              start.dy - thickness / 2,
+              doorStart - currentPos,
+              thickness,
+            );
+            canvas.drawRect(rect, wallPaint);
+          } else {
+            final rect = Rect.fromLTWH(
+              start.dx - thickness / 2,
+              (start.dy < end.dy ? start.dy : end.dy) + currentPos,
+              thickness,
+              doorStart - currentPos,
+            );
+            canvas.drawRect(rect, wallPaint);
+          }
+        }
+
+        // Draw door opening marker
+        final doorPaint = Paint()
+          ..color = Colors.white
+          ..style = PaintingStyle.fill;
+
+        final doorMarkerPaint = Paint()
+          ..color = Colors.orange.shade700
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2;
+
+        if (isHorizontal) {
+          final doorRect = Rect.fromLTWH(
+            (start.dx < end.dx ? start.dx : end.dx) + doorStart,
+            start.dy - thickness / 2,
+            door.width,
+            thickness,
+          );
+          canvas.drawRect(doorRect, doorPaint);
+          canvas.drawRect(doorRect, doorMarkerPaint);
+        } else {
+          final doorRect = Rect.fromLTWH(
+            start.dx - thickness / 2,
+            (start.dy < end.dy ? start.dy : end.dy) + doorStart,
+            thickness,
+            door.width,
+          );
+          canvas.drawRect(doorRect, doorPaint);
+          canvas.drawRect(doorRect, doorMarkerPaint);
+        }
+
+        currentPos = doorEnd;
+      }
+
+      // Draw remaining wall after last door
+      if (currentPos < wallLength) {
+        if (isHorizontal) {
+          final rect = Rect.fromLTWH(
+            (start.dx < end.dx ? start.dx : end.dx) + currentPos,
+            start.dy - thickness / 2,
+            wallLength - currentPos,
+            thickness,
+          );
+          canvas.drawRect(rect, wallPaint);
+        } else {
+          final rect = Rect.fromLTWH(
+            start.dx - thickness / 2,
+            (start.dy < end.dy ? start.dy : end.dy) + currentPos,
+            thickness,
+            wallLength - currentPos,
+          );
+          canvas.drawRect(rect, wallPaint);
+        }
+      }
+    }
   }
 
   void _drawDoor(Canvas canvas, DoorConnection door) {
@@ -473,6 +776,7 @@ class RoomData {
   final Size size;
   double rotation;
   final Color color;
+  final List<DoorPosition> doorPositions;
 
   RoomData({
     required this.id,
@@ -481,6 +785,20 @@ class RoomData {
     required this.size,
     this.rotation = 0.0,
     required this.color,
+    List<DoorPosition>? doorPositions,
+  }) : doorPositions = doorPositions ?? [];
+}
+
+/// Door position on a room wall
+class DoorPosition {
+  final String wall; // 'top', 'right', 'bottom', 'left'
+  final double position; // 0.0 to 1.0 along the wall
+  final double width; // Width of door opening in pixels
+
+  DoorPosition({
+    required this.wall,
+    required this.position,
+    this.width = 30.0,
   });
 }
 
