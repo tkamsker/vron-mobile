@@ -11,6 +11,9 @@ class ScanData {
   /// Project ID this scan belongs to (null for guest mode)
   final String? projectId;
 
+  /// Project name (cached for display)
+  final String? projectName;
+
   /// Scan start timestamp
   final DateTime startedAt;
 
@@ -45,6 +48,7 @@ class ScanData {
     required this.id,
     this.roomName,
     this.projectId,
+    this.projectName,
     required this.startedAt,
     this.completedAt,
     this.pointsCollected = 0,
@@ -61,11 +65,13 @@ class ScanData {
   factory ScanData.newSession({
     required String id,
     String? projectId,
+    String? projectName,
     bool isGuestMode = false,
   }) {
     return ScanData(
       id: id,
       projectId: projectId,
+      projectName: projectName,
       startedAt: DateTime.now(),
       isGuestMode: isGuestMode,
       status: ScanStatus.ready,
@@ -77,6 +83,7 @@ class ScanData {
     String? id,
     String? roomName,
     String? projectId,
+    String? projectName,
     DateTime? startedAt,
     DateTime? completedAt,
     int? pointsCollected,
@@ -92,6 +99,7 @@ class ScanData {
       id: id ?? this.id,
       roomName: roomName ?? this.roomName,
       projectId: projectId ?? this.projectId,
+      projectName: projectName ?? this.projectName,
       startedAt: startedAt ?? this.startedAt,
       completedAt: completedAt ?? this.completedAt,
       pointsCollected: pointsCollected ?? this.pointsCollected,
@@ -126,6 +134,7 @@ class ScanData {
         other.id == id &&
         other.roomName == roomName &&
         other.projectId == projectId &&
+        other.projectName == projectName &&
         other.startedAt == startedAt &&
         other.completedAt == completedAt &&
         other.pointsCollected == pointsCollected &&
@@ -144,6 +153,7 @@ class ScanData {
       id,
       roomName,
       projectId,
+      projectName,
       startedAt,
       completedAt,
       pointsCollected,

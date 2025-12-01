@@ -34,6 +34,7 @@ class Rooms extends Table {
   TextColumn get id => text()();
   TextColumn get projectId =>
       text().references(Projects, #id, onDelete: KeyAction.cascade)();
+  TextColumn get sessionId => text().nullable().references(ScanSessions, #id, onDelete: KeyAction.setNull)();
   TextColumn get name => text().withLength(min: 1, max: 255)();
   DateTimeColumn get scanDate => dateTime()();
   TextColumn get sceneGlbPath => text().nullable()();
@@ -113,10 +114,25 @@ class DemoAssetsCache extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Scan sessions table - Groups multiple room scans together
+class ScanSessions extends Table {
+  TextColumn get id => text()();
+  TextColumn get name => text()(); // e.g., "Morning Session", "Floor 1 Scan"
+  TextColumn get projectId => text().nullable().references(Projects, #id, onDelete: KeyAction.cascade)();
+  TextColumn get projectName => text().nullable()(); // Cached project name for display
+  BoolColumn get isGuestMode => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 /// Guest scans table - Scans made in guest mode (not uploaded)
 class GuestScans extends Table {
   TextColumn get id => text()();
   TextColumn get name => text()();
+  TextColumn get sessionId => text().nullable().references(ScanSessions, #id, onDelete: KeyAction.cascade)();
   DateTimeColumn get scanDate => dateTime()();
   TextColumn get sceneGlbPath => text()();
   TextColumn get navmeshGlbPath => text().nullable()();
@@ -135,13 +151,14 @@ class GuestScans extends Table {
   UserCache,
   GraphQLCacheMeta,
   DemoAssetsCache,
+  ScanSessions,
   GuestScans,
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration {
@@ -150,7 +167,16 @@ class AppDatabase extends _$AppDatabase {
         await m.createAll();
       },
       onUpgrade: (Migrator m, int from, int to) async {
-        // Migration logic will be added here in future versions
+        if (from == 1 && to == 2) {
+          // Add ScanSessions table
+          await m.createTable(scanSessions);
+
+          // Add sessionId column to Rooms table
+          await m.addColumn(rooms, rooms.sessionId);
+
+          // Add sessionId column to GuestScans table
+          await m.addColumn(guestScans, guestScans.sessionId);
+        }
       },
     );
   }
@@ -177,6 +203,32 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> upsertRoom(RoomsCompanion room) =>
       into(rooms).insertOnConflictUpdate(room);
+
+  // Scan session queries
+  Stream<List<ScanSession>> watchAllSessions() =>
+      (select(scanSessions)..orderBy([(s) => OrderingTerm.desc(s.createdAt)])).watch();
+
+  Stream<List<ScanSession>> watchSessionsByProject(String projectId) =>
+      (select(scanSessions)
+            ..where((s) => s.projectId.equals(projectId))
+            ..orderBy([(s) => OrderingTerm.desc(s.createdAt)]))
+          .watch();
+
+  Future<ScanSession?> getSession(String sessionId) =>
+      (select(scanSessions)..where((s) => s.id.equals(sessionId))).getSingleOrNull();
+
+  Future<void> upsertSession(ScanSessionsCompanion session) =>
+      into(scanSessions).insertOnConflictUpdate(session);
+
+  Future<void> deleteSession(String sessionId) =>
+      (delete(scanSessions)..where((s) => s.id.equals(sessionId))).go();
+
+  // Get scans by session
+  Stream<List<Room>> watchRoomsBySession(String sessionId) =>
+      (select(rooms)..where((r) => r.sessionId.equals(sessionId))).watch();
+
+  Stream<List<GuestScan>> watchGuestScansBySession(String sessionId) =>
+      (select(guestScans)..where((g) => g.sessionId.equals(sessionId))).watch();
 
   // Upload queue queries
   Stream<List<UploadQueueData>> watchPendingUploads() => (select(uploadQueue)

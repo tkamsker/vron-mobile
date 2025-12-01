@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:async';
 import 'dart:io' show Platform;
 import 'package:uuid/uuid.dart';
+import 'package:roomplan_flutter/roomplan_flutter.dart';
 import '../models/scan_data.dart';
-import '../services/room_scanner_platform.dart';
+import '../repositories/scan_repository_provider.dart';
 import 'scan_preview_screen.dart';
 
 /// LiDAR Scan screen with simulated scanning
@@ -28,7 +30,8 @@ class ScanScreen extends ConsumerStatefulWidget {
 class _ScanScreenState extends ConsumerState<ScanScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final _roomScanner = RoomScannerPlatform();
+  late RoomPlanScanner _roomScanner;
+  StreamSubscription<ScanResult?>? _scanSubscription;
   bool _isScanning = false;
   bool _isLidarAvailable = false;
   bool _isCheckingLidar = true;
@@ -36,11 +39,13 @@ class _ScanScreenState extends ConsumerState<ScanScreen>
   String _scanStatus = 'Ready to scan';
   int _pointsCollected = 0;
   String _scanInstruction = '';
+  ScanResult? _currentScanResult;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _roomScanner = RoomPlanScanner();
     _checkLidarAvailability();
     _listenToScanEvents();
   }
@@ -48,6 +53,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen>
   @override
   void dispose() {
     _tabController.dispose();
+    _scanSubscription?.cancel();
     super.dispose();
   }
 
@@ -61,7 +67,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen>
       return;
     }
 
-    final available = await _roomScanner.isRoomPlanAvailable();
+    final available = await RoomPlanScanner.isSupported();
 
     if (!mounted) return;
 
@@ -71,60 +77,36 @@ class _ScanScreenState extends ConsumerState<ScanScreen>
     });
   }
 
-  /// Listen to scan events from native platform
+  /// Listen to scan events from RoomPlanScanner
   void _listenToScanEvents() {
-    _roomScanner.getScanEventStream().listen((event) {
+    _scanSubscription = _roomScanner.onScanResult.listen((scanResult) {
       if (!mounted) return;
 
-      switch (event.type) {
-        case RoomScanEventType.started:
-          setState(() {
-            _isScanning = true;
-            _scanStatus = 'Scanning...';
-          });
-          break;
+      if (scanResult != null) {
+        setState(() {
+          _currentScanResult = scanResult;
+          // Update UI with real-time scan data
+          final wallCount = scanResult.room.walls.length;
+          final doorCount = scanResult.room.doors.length;
+          final windowCount = scanResult.room.windows.length;
 
-        case RoomScanEventType.progress:
-          setState(() {
-            _scanInstruction = event.data['instruction'] as String? ?? '';
-          });
-          break;
-
-        case RoomScanEventType.pointsUpdated:
-          setState(() {
-            _pointsCollected = event.pointCount;
-            _scanProgress = event.progress;
-          });
-          break;
-
-        case RoomScanEventType.completed:
-          setState(() {
-            _isScanning = false;
-            _scanStatus = 'Scan complete';
-            _scanProgress = 1.0;
-          });
-          break;
-
-        case RoomScanEventType.error:
-          setState(() {
-            _isScanning = false;
-            _scanStatus = 'Error: ${event.error}';
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Scan error: ${event.error}')),
-          );
-          break;
-
-        case RoomScanEventType.canceled:
-          setState(() {
-            _isScanning = false;
-            _scanStatus = 'Scan canceled';
-          });
-          break;
-
-        default:
-          break;
+          _pointsCollected = (wallCount + doorCount + windowCount) * 100; // Estimated points
+          _scanProgress = (wallCount / 4).clamp(0.0, 1.0); // Estimate: 4 walls = 100%
+          _scanStatus = 'Scanning... ($wallCount walls detected)';
+          _scanInstruction = 'Move slowly around the room';
+        });
       }
+    }, onError: (error) {
+      if (!mounted) return;
+
+      setState(() {
+        _isScanning = false;
+        _scanStatus = 'Error: $error';
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Scan error: $error')),
+      );
     });
   }
 
@@ -139,38 +121,106 @@ class _ScanScreenState extends ConsumerState<ScanScreen>
       return;
     }
 
-    final started = await _roomScanner.startScanning();
-    if (!started) {
+    setState(() {
+      _isScanning = true;
+      _scanStatus = 'Starting scan...';
+    });
+
+    try {
+      // Configure scan settings with real-time updates enabled
+      const configuration = ScanConfiguration(
+        enableRealtimeUpdates: true,
+        detectDoors: true,
+        detectWindows: true,
+      );
+
+      // Start scanning with RoomPlanScanner
+      final result = await _roomScanner.startScanning(configuration: configuration);
+
+      if (result != null && mounted) {
+        // Scan completed successfully
+        setState(() {
+          _isScanning = false;
+          _scanStatus = 'Scan complete';
+          _scanProgress = 1.0;
+          _currentScanResult = result;
+        });
+
+        // Process and save the scan result
+        _handleScanResult(result);
+      } else if (mounted) {
+        // Scan was canceled or failed
+        setState(() {
+          _isScanning = false;
+          _scanStatus = 'Scan canceled';
+        });
+      }
+    } catch (error) {
       if (mounted) {
+        setState(() {
+          _isScanning = false;
+          _scanStatus = 'Error: $error';
+        });
+
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to start scanning')),
+          SnackBar(content: Text('Failed to start scanning: $error')),
         );
       }
     }
   }
 
   Future<void> _stopScanning() async {
-    final result = await _roomScanner.stopScanning();
-    if (result != null && mounted) {
-      // Handle scan result
-      _handleScanResult(result);
+    // Note: RoomPlanScanner's startScanning() is modal and blocks until complete
+    // There's no explicit stop method - user dismisses the scanning UI natively
+    // This method is called when user completes the scan
+    if (_currentScanResult != null && mounted) {
+      _handleScanResult(_currentScanResult!);
     }
   }
 
-  void _handleScanResult(RoomScanResult result) {
+  Future<void> _handleScanResult(ScanResult result) async {
+    // Extract scan metrics from RoomPlan result
+    final wallCount = result.room.walls.length;
+    final doorCount = result.room.doors.length;
+    final windowCount = result.room.windows.length;
+    final estimatedPoints = (wallCount + doorCount + windowCount) * 100;
+
+    // Debug: Log scan data
+    print('=== SCAN COMPLETED ===');
+    print('Walls: $wallCount, Doors: $doorCount, Windows: $windowCount');
+    print('Room dimensions: ${result.room.dimensions}');
+    print('Project: ${widget.projectName}, Guest mode: ${widget.guestMode}');
+
     // Create scan data object
+    // If no project ID is provided, treat as guest scan
+    final effectiveGuestMode = widget.guestMode || widget.projectName == null;
+
     final scanData = ScanData(
-      id: result.scanId,
+      id: const Uuid().v4(), // Generate new scan ID
+      roomName: 'Room ${DateTime.now().toString().substring(0, 16)}',
       projectId: widget.projectName,
-      startedAt: DateTime.now().subtract(Duration(seconds: result.duration.toInt())),
+      startedAt: DateTime.now().subtract(const Duration(minutes: 1)), // Estimate
       completedAt: DateTime.now(),
-      pointsCollected: result.pointCount,
-      durationSeconds: result.duration,
-      isGuestMode: widget.guestMode,
+      pointsCollected: estimatedPoints,
+      durationSeconds: 60, // Estimate: 1 minute scan
+      isGuestMode: effectiveGuestMode,
       status: ScanStatus.completed,
     );
 
-    // Navigate to preview screen
+    if (!mounted) return;
+
+    // Show scan complete message
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '✅ Scan complete! $wallCount walls, $doorCount doors, $windowCount windows',
+        ),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+
+    // Navigate to preview screen (user will save from there)
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => ScanPreviewScreen(scanData: scanData),
@@ -439,17 +489,21 @@ class _ScanScreenState extends ConsumerState<ScanScreen>
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
                                   _isScanning ? Icons.stop : Icons.play_arrow,
                                   size: 24,
                                 ),
                                 const SizedBox(width: 8),
-                                Text(
-                                  _isScanning ? 'Stop scanning' : 'Start scanning',
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
+                                Flexible(
+                                  child: Text(
+                                    _isScanning ? 'Stop scanning' : 'Start scanning',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                               ],

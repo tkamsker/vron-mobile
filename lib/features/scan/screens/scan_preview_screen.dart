@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../models/scan_data.dart';
 import '../repositories/scan_repository_provider.dart';
+import 'scan_sessions_screen.dart';
 
 /// Scan preview screen
 ///
@@ -59,23 +60,47 @@ class _ScanPreviewScreenState extends ConsumerState<ScanPreviewScreen> {
     setState(() => _isSaving = true);
 
     try {
+      print('📁 Saving scan from preview screen...');
+      print('Room name: $roomName');
+      print('Scan ID: ${widget.scanData.id}');
+      print('Guest mode: ${widget.scanData.isGuestMode}');
+      print('Project ID: ${widget.scanData.projectId}');
+
       final repository = ref.read(scanRepositoryProvider);
       await repository.saveScan(widget.scanData, roomName);
 
+      print('✅ Scan saved successfully from preview!');
+
       if (mounted) {
-        // Pop twice to go back to main screen
+        // Pop the preview screen
         Navigator.of(context).pop();
+        // Pop the scan screen
         Navigator.of(context).pop();
+
+        // Navigate to session list
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => ScanSessionsScreen(
+              projectId: widget.scanData.projectId,
+              projectName: widget.scanData.projectName,
+            ),
+          ),
+        );
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('$roomName saved successfully'),
             backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
           ),
         );
       }
     } catch (e) {
+      print('❌ Error saving from preview: $e');
+
       if (mounted) {
+        setState(() => _isSaving = false);
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to save scan: $e'),
@@ -122,248 +147,153 @@ class _ScanPreviewScreenState extends ConsumerState<ScanPreviewScreen> {
     );
   }
 
+  void _scanAnotherRoom() {
+    // Pop preview screen to go back to scan screen
+    Navigator.of(context).pop();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     return Scaffold(
+      backgroundColor: Colors.grey.shade100,
       appBar: AppBar(
-        title: const Text('Scan Preview'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.delete_outline),
-            onPressed: _discardScan,
-            tooltip: 'Discard scan',
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, size: 20),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 3D Preview Container
-            Container(
-              height: 300,
-              color: Colors.grey.shade900,
-              child: Stack(
-                children: [
-                  Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.threed_rotation,
-                          size: 80,
-                          color: Colors.white.withOpacity(0.3),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          '3D Preview',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.5),
-                            fontSize: 16,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Coming soon',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.3),
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Scan complete badge
-                  Positioned(
-                    top: 16,
-                    right: 16,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.green,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.check_circle,
-                            color: Colors.white,
-                            size: 16,
-                          ),
-                          SizedBox(width: 6),
-                          Text(
-                            'Scan Complete',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
+            const Text(
+              'Scan Preview',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
               ),
             ),
-
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Room name input
-                  Text(
-                    'Room Name',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: _roomNameController,
-                    decoration: InputDecoration(
-                      hintText: 'Enter room name',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      prefixIcon: const Icon(Icons.room_outlined),
-                    ),
-                    textCapitalization: TextCapitalization.words,
-                  ),
-
-                  const SizedBox(height: 32),
-
-                  // Scan statistics
-                  Text(
-                    'Scan Statistics',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  _StatCard(
-                    icon: Icons.scatter_plot,
-                    label: 'Points Collected',
-                    value: '${widget.scanData.pointsCollected.toStringAsFixed(0)} points',
-                    color: Colors.blue,
-                  ),
-                  const SizedBox(height: 12),
-
-                  _StatCard(
-                    icon: Icons.timer_outlined,
-                    label: 'Scan Duration',
-                    value: _formatDuration(widget.scanData.durationSeconds),
-                    color: Colors.orange,
-                  ),
-                  const SizedBox(height: 12),
-
-                  _StatCard(
-                    icon: Icons.calendar_today_outlined,
-                    label: 'Scan Date',
-                    value: DateFormat('MMM d, yyyy HH:mm').format(
-                      widget.scanData.completedAt ?? widget.scanData.startedAt,
-                    ),
-                    color: Colors.purple,
-                  ),
-                  const SizedBox(height: 12),
-
-                  _StatCard(
-                    icon: widget.scanData.isGuestMode
-                        ? Icons.person_outline
-                        : Icons.cloud_outlined,
-                    label: 'Mode',
-                    value: widget.scanData.isGuestMode ? 'Guest Mode' : 'Cloud Sync',
-                    color: widget.scanData.isGuestMode
-                        ? Colors.grey
-                        : Colors.green,
-                  ),
-
-                  if (widget.scanData.isGuestMode) ...[
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.orange.shade50,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: Colors.orange.shade200,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.info_outline,
-                            color: Colors.orange.shade700,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              'Guest mode scan - Saved locally only. Sign in to sync to cloud.',
-                              style: TextStyle(
-                                color: Colors.orange.shade900,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ],
+            Text(
+              'Scan completed - Room 1',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.normal,
+                color: Colors.grey.shade600,
               ),
             ),
           ],
         ),
-      ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: _isSaving ? null : _discardScan,
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    side: BorderSide(color: theme.colorScheme.error),
-                    foregroundColor: theme.colorScheme.error,
-                  ),
-                  child: const Text('Discard'),
-                ),
+        actions: [
+          Container(
+            margin: const EdgeInsets.only(right: 16, top: 12, bottom: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              'Ready to save',
+              style: TextStyle(
+                color: Colors.blue.shade700,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                flex: 2,
-                child: ElevatedButton.icon(
-                  onPressed: _isSaving ? null : _saveScan,
-                  icon: _isSaving
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        )
-                      : const Icon(Icons.save),
-                  label: Text(_isSaving ? 'Saving...' : 'Save Scan'),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // 3D Room Visualization
+          Expanded(
+            child: Container(
+              margin: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.black,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Center(
+                child: CustomPaint(
+                  size: const Size(300, 300),
+                  painter: RoomPlanPainter(
+                    pointsCollected: widget.scanData.pointsCollected,
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Action Buttons
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  // Save Scan Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: _isSaving ? null : _saveScan,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      icon: _isSaving
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : const Icon(Icons.save, size: 24),
+                      label: Text(
+                        _isSaving ? 'Saving...' : 'Save Scan',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Scan Another Room Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _isSaving ? null : _scanAnotherRoom,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.blue,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        side: const BorderSide(color: Colors.blue, width: 1.5),
+                      ),
+                      icon: const Icon(Icons.add_circle_outline, size: 24),
+                      label: const Text(
+                        'Scan Another Room',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -449,4 +379,112 @@ class _StatCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Custom painter for simple room floor plan visualization
+class RoomPlanPainter extends CustomPainter {
+  final int pointsCollected;
+
+  RoomPlanPainter({required this.pointsCollected});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Use orange/gold color scheme to match design mockup
+    const orangeColor = Color(0xFFD4A056); // Gold/Orange color
+
+    // Draw 3D room outline with perspective
+    final roomPaint = Paint()
+      ..color = orangeColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5;
+
+    final fillPaint = Paint()
+      ..color = orangeColor.withOpacity(0.05)
+      ..style = PaintingStyle.fill;
+
+    // Create a 3D-like perspective room
+    final centerX = size.width / 2;
+    final centerY = size.height / 2;
+
+    // Front face (larger)
+    final frontRect = Rect.fromCenter(
+      center: Offset(centerX, centerY + 20),
+      width: size.width * 0.55,
+      height: size.height * 0.45,
+    );
+
+    // Back face (smaller, for perspective)
+    final backRect = Rect.fromCenter(
+      center: Offset(centerX, centerY - 30),
+      width: size.width * 0.35,
+      height: size.height * 0.3,
+    );
+
+    // Draw back face
+    canvas.drawRect(backRect, fillPaint);
+    canvas.drawRect(backRect, roomPaint);
+
+    // Draw connecting lines (depth)
+    canvas.drawLine(frontRect.topLeft, backRect.topLeft, roomPaint);
+    canvas.drawLine(frontRect.topRight, backRect.topRight, roomPaint);
+    canvas.drawLine(frontRect.bottomLeft, backRect.bottomLeft, roomPaint);
+    canvas.drawLine(frontRect.bottomRight, backRect.bottomRight, roomPaint);
+
+    // Draw front face
+    canvas.drawRect(frontRect, roomPaint);
+
+    // Draw floor grid for depth
+    final gridPaint = Paint()
+      ..color = orangeColor.withOpacity(0.3)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+
+    // Horizontal floor lines
+    for (int i = 1; i < 4; i++) {
+      final y = frontRect.bottom - (frontRect.height * i / 4);
+      final backY = backRect.bottom - (backRect.height * i / 4);
+      canvas.drawLine(
+        Offset(frontRect.left, y),
+        Offset(backRect.left, backY),
+        gridPaint,
+      );
+      canvas.drawLine(
+        Offset(frontRect.right, y),
+        Offset(backRect.right, backY),
+        gridPaint,
+      );
+    }
+
+    // Draw corner markers on front face
+    final markerPaint = Paint()
+      ..color = orangeColor
+      ..style = PaintingStyle.fill;
+
+    final corners = [
+      frontRect.topLeft,
+      frontRect.topRight,
+      frontRect.bottomLeft,
+      frontRect.bottomRight,
+    ];
+
+    for (final corner in corners) {
+      canvas.drawCircle(corner, 3, markerPaint);
+    }
+
+    // Draw scan points as small dots scattered in the room
+    final pointPaint = Paint()
+      ..color = orangeColor.withOpacity(0.6)
+      ..style = PaintingStyle.fill;
+
+    final random = pointsCollected.hashCode;
+    for (int i = 0; i < (pointsCollected / 100).clamp(8, 25); i++) {
+      final x = frontRect.left + (frontRect.width * ((random + i * 37) % 100) / 100);
+      final y = frontRect.top + (frontRect.height * ((random + i * 73) % 100) / 100);
+      canvas.drawCircle(Offset(x, y), 1.5, pointPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(RoomPlanPainter oldDelegate) =>
+      oldDelegate.pointsCollected != pointsCollected;
 }

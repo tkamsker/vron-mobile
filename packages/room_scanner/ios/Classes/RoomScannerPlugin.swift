@@ -18,7 +18,10 @@ public class RoomScannerPlugin: NSObject, FlutterPlugin {
     private var eventSink: FlutterEventSink?
 
     private var roomCaptureSession: RoomCaptureSession?
+    private var roomCaptureView: RoomCaptureView?
     private var currentSessionId: String?
+    private var currentOutputPath: String?
+    private var capturedRoom: CapturedRoom?
 
     public static func register(with registrar: FlutterPluginRegistrar) {
         let methodChannel = FlutterMethodChannel(
@@ -140,18 +143,44 @@ public class RoomScannerPlugin: NSObject, FlutterPlugin {
         // Create new session
         let sessionId = UUID().uuidString
         currentSessionId = sessionId
+        currentOutputPath = outputPath
 
-        // Initialize RoomCaptureSession (actual implementation would be more complex)
-        // This is a placeholder for the native implementation
+        do {
+            // Initialize RoomCaptureSession
+            let captureSession = RoomCaptureSession()
+            roomCaptureSession = captureSession
 
-        // Send initial progress
-        eventSink?([
-            "percentage": 0.0,
-            "message": "Starting room scan...",
-            "pointCount": 0
-        ])
+            // Create RoomCaptureView for presenting the scanning interface
+            let captureView = RoomCaptureView(frame: .zero)
+            roomCaptureView = captureView
 
-        result(sessionId)
+            // Configure the session
+            var configuration = RoomCaptureSession.Configuration()
+            configuration.isCoachingEnabled = true // Show user guidance
+
+            // Start the capture session
+            captureSession.run(configuration: configuration)
+
+            // Set up delegate for callbacks (implemented below)
+            captureSession.delegate = self
+
+            // Send initial progress
+            sendEvent([
+                "type": "started",
+                "data": [
+                    "sessionId": sessionId,
+                    "message": "Room scan started"
+                ]
+            ])
+
+            result(sessionId)
+        } catch {
+            result(FlutterError(
+                code: "START_FAILED",
+                message: "Failed to start room scanning: \(error.localizedDescription)",
+                details: nil
+            ))
+        }
     }
 
     private func handleStopScanning(result: @escaping FlutterResult) {

@@ -13,19 +13,68 @@ class ScanRepository {
 
   ScanRepository(this._database);
 
+  /// Expose database for direct queries
+  AppDatabase get database => _database;
+
   /// Save a completed scan
   ///
   /// Saves to Rooms table if authenticated, GuestScans table if guest mode
-  Future<void> saveScan(ScanData scanData, String roomName) async {
+  /// Creates a new scan session for this scan
+  Future<void> saveScan(
+    ScanData scanData,
+    String roomName, {
+    String? existingSessionId,
+    String? sessionName,
+  }) async {
+    // Create or get session
+    final sessionId = existingSessionId ?? _uuid.v4();
+
+    if (existingSessionId == null) {
+      // Create a new session
+      await _createSession(
+        sessionId: sessionId,
+        sessionName: sessionName ?? 'Scan Session ${DateTime.now().toString().substring(0, 16)}',
+        projectId: scanData.projectId,
+        projectName: scanData.projectName,
+        isGuestMode: scanData.isGuestMode,
+      );
+    }
+
     if (scanData.isGuestMode) {
-      await _saveGuestScan(scanData, roomName);
+      await _saveGuestScan(scanData, roomName, sessionId);
     } else {
-      await _saveAuthenticatedScan(scanData, roomName);
+      await _saveAuthenticatedScan(scanData, roomName, sessionId);
     }
   }
 
+  /// Create a new scan session
+  Future<void> _createSession({
+    required String sessionId,
+    required String sessionName,
+    String? projectId,
+    String? projectName,
+    required bool isGuestMode,
+  }) async {
+    final now = DateTime.now();
+    final session = ScanSessionsCompanion(
+      id: Value(sessionId),
+      name: Value(sessionName),
+      projectId: Value(projectId),
+      projectName: Value(projectName),
+      isGuestMode: Value(isGuestMode),
+      createdAt: Value(now),
+      updatedAt: Value(now),
+    );
+
+    await _database.upsertSession(session);
+  }
+
   /// Save scan in authenticated mode
-  Future<void> _saveAuthenticatedScan(ScanData scanData, String roomName) async {
+  Future<void> _saveAuthenticatedScan(
+    ScanData scanData,
+    String roomName,
+    String sessionId,
+  ) async {
     if (scanData.projectId == null) {
       throw ArgumentError('ProjectId is required for authenticated scans');
     }
@@ -33,6 +82,7 @@ class ScanRepository {
     final room = RoomsCompanion(
       id: Value(scanData.id),
       projectId: Value(scanData.projectId!),
+      sessionId: Value(sessionId),
       name: Value(roomName),
       scanDate: Value(scanData.completedAt ?? DateTime.now()),
       sceneGlbPath: Value(scanData.sceneGlbPath),
@@ -48,10 +98,15 @@ class ScanRepository {
   }
 
   /// Save scan in guest mode
-  Future<void> _saveGuestScan(ScanData scanData, String roomName) async {
+  Future<void> _saveGuestScan(
+    ScanData scanData,
+    String roomName,
+    String sessionId,
+  ) async {
     final guestScan = GuestScansCompanion(
       id: Value(scanData.id),
       name: Value(roomName),
+      sessionId: Value(sessionId),
       scanDate: Value(scanData.completedAt ?? DateTime.now()),
       sceneGlbPath: Value(scanData.sceneGlbPath ?? ''),
       navmeshGlbPath: Value(scanData.navmeshGlbPath),
