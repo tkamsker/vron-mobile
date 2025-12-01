@@ -218,10 +218,10 @@ Flutter project structure per plan.md:
 - [X] T091 [P] [US3] Unit test for USDZ→GLB conversion logic in test/packages/asset_converter/usdz_to_glb_test.dart
 - [X] T092 [P] [US3] Widget test for scan progress UI in test/widget_test/features/scanning/scan_progress_test.dart
 - [X] T093 [P] [US3] Widget test for 3D preview viewer in test/widget_test/features/scanning/glb_viewer_test.dart
-- [ ] T094 [US3] Integration test for complete scan flow on iOS simulator (mock LiDAR) in test/integration_test/scan_flow_test.dart
-- [ ] T095 [US3] Integration test for platform channel: scanRoom_v1 in test/integration_test/room_scanner_channel_test.dart
-- [ ] T096 [US3] Integration test for platform channel: convertToGlb_v1 in test/integration_test/asset_converter_channel_test.dart
-- [ ] T097 [US3] Golden test for 3D preview UI in test/golden_test/scanning/glb_viewer_golden_test.dart
+- [X] T094 [US3] Integration test for complete scan flow on iOS simulator (mock LiDAR) in test/integration_test/scan_flow_test.dart
+- [X] T095 [US3] Integration test for platform channel: scanRoom_v1 in test/integration_test/room_scanner_channel_test.dart
+- [X] T096 [US3] Integration test for platform channel: convertToGlb_v1 in test/integration_test/asset_converter_channel_test.dart
+- [X] T097 [US3] Golden test for 3D preview UI in test/goldens/glb_viewer_golden_test.dart
 
 ### iOS Native Implementation for User Story 3 (Constitution Principle IV)
 
@@ -267,12 +267,12 @@ Flutter project structure per plan.md:
 
 ### 3D Viewer Implementation for User Story 3
 
-- [ ] T126 [P] [US3] Setup three_dart package in packages/vron_3d_viewer/pubspec.yaml
-- [ ] T127 [P] [US3] Create GlbViewerWidget with three_dart renderer in packages/vron_3d_viewer/lib/src/glb_viewer_widget.dart
-- [ ] T128 [P] [US3] Implement GLB model loading in packages/vron_3d_viewer/lib/src/glb_loader.dart
-- [ ] T129 [P] [US3] Implement PBR material rendering (albedo, normal, metallic, roughness) in packages/vron_3d_viewer/lib/src/pbr_renderer.dart
-- [ ] T130 [P] [US3] Implement touch gesture controls: rotate, zoom, pan in packages/vron_3d_viewer/lib/src/gesture_controller.dart
-- [ ] T131 [US3] Add RepaintBoundary around 3D viewer to isolate repaints in packages/vron_3d_viewer/lib/src/glb_viewer_widget.dart
+- [X] T126 [P] [US3] Setup three_dart package in packages/vron_3d_viewer/pubspec.yaml
+- [X] T127 [P] [US3] Create GlbViewerWidget with three_dart renderer in packages/vron_3d_viewer/lib/src/glb_viewer_widget.dart
+- [X] T128 [P] [US3] Implement GLB model loading in packages/vron_3d_viewer/lib/src/glb_loader.dart
+- [X] T129 [P] [US3] Implement PBR material rendering (albedo, normal, metallic, roughness) in packages/vron_3d_viewer/lib/src/pbr_renderer.dart
+- [X] T130 [P] [US3] Implement touch gesture controls: rotate, zoom, pan in packages/vron_3d_viewer/lib/src/gesture_controller.dart
+- [X] T131 [US3] Add RepaintBoundary around 3D viewer to isolate repaints in packages/vron_3d_viewer/lib/src/glb_viewer_widget.dart
 
 ### UI Implementation for User Story 3
 
@@ -294,11 +294,11 @@ Flutter project structure per plan.md:
 - [X] T144 [US3] Clean up temp USDZ file after successful conversion (handled by scan workflow)
 
 **Performance Validation (Constitution Principle I & VI)**:
-- [ ] T145 [US3] Verify 3D preview rendering maintains 30fps minimum
-- [ ] T146 [US3] Verify USDZ→GLB conversion completes in <10 seconds for typical room (1000 vertices)
-- [ ] T147 [US3] Verify spatial accuracy within 5cm tolerance for room dimensions
-- [ ] T148 [US3] Verify 100% texture preservation: input count == output count
-- [ ] T149 [US3] Verify memory usage <500MB peak during active scanning
+- [X] T145 [US3] Verify 3D preview rendering maintains 30fps minimum
+- [X] T146 [US3] Verify USDZ→GLB conversion completes in <10 seconds for typical room (1000 vertices)
+- [X] T147 [US3] Verify spatial accuracy within 5cm tolerance for room dimensions
+- [X] T148 [US3] Verify 100% texture preservation: input count == output count
+- [X] T149 [US3] Verify memory usage <500MB peak during active scanning
 
 **Checkpoint**: User Story 3 complete - users can scan rooms, convert to GLB, and preview 3D models
 
