@@ -122,21 +122,21 @@ Flutter project structure per plan.md:
 
 ### UI Implementation for User Story 1
 
-- [ ] T049 [P] [US1] Create LoginScreen widget with email/password fields in lib/features/auth/screens/login_screen.dart
-- [ ] T050 [P] [US1] Create LoginForm widget with validation logic in lib/features/auth/widgets/login_form.dart
-- [ ] T051 [US1] Integrate AuthNotifier with LoginScreen in lib/features/auth/screens/login_screen.dart
-- [ ] T052 [US1] Create navigation logic: authenticated → projects list, unauthenticated → login in lib/core/routing/app_router.dart
-- [ ] T053 [US1] Implement session persistence: check secure storage on app launch in lib/main.dart
-- [ ] T054 [US1] Add error message display for invalid credentials in lib/features/auth/widgets/auth_error_display.dart
-- [ ] T055 [US1] Add loading indicator during authentication in lib/features/auth/widgets/auth_loading.dart
+- [X] T049 [P] [US1] Create LoginScreen widget with email/password fields in lib/features/auth/screens/login_screen.dart
+- [X] T050 [P] [US1] Create LoginForm widget with validation logic in lib/features/auth/widgets/login_form.dart
+- [X] T051 [US1] Integrate AuthNotifier with LoginScreen in lib/features/auth/screens/login_screen.dart
+- [X] T052 [US1] Create navigation logic: authenticated → projects list, unauthenticated → login in lib/core/routing/app_router.dart
+- [X] T053 [US1] Implement session persistence: check secure storage on app launch in lib/main.dart
+- [X] T054 [US1] Add error message display for invalid credentials in lib/features/auth/widgets/auth_error_display.dart
+- [X] T055 [US1] Add loading indicator during authentication in lib/features/auth/widgets/auth_loading.dart
 
 ### Offline Support for User Story 1 (Constitution Principle II)
 
-- [ ] T056 [US1] Implement offline auth state restoration from secure storage in lib/core/auth/offline_auth.dart
-- [ ] T057 [US1] Cache user profile data in Drift after successful login in lib/core/database/user_cache.dart
+- [X] T056 [US1] Implement offline auth state restoration from secure storage in lib/core/auth/offline_auth.dart
+- [X] T057 [US1] Cache user profile data in Drift after successful login in lib/core/database/user_cache.dart
 
 **Performance Validation (Constitution Principle I)**:
-- [ ] T058 [US1] Verify app launch to projects list <3 seconds with cached credentials
+- [X] T058 [US1] Verify app launch to projects list <3 seconds with cached credentials
 
 **Checkpoint**: User Story 1 complete - users can log in, stay authenticated, and access projects
 
@@ -165,27 +165,27 @@ Flutter project structure per plan.md:
 
 > **REMINDER: Tests must FAIL before starting implementation (TDD red phase)**
 
-- [ ] T067 [P] [US2] Create Projects query GraphQL document in packages/vron_graphql_client/graphql/queries/projects.graphql
-- [ ] T068 [P] [US2] Create Project query (single) GraphQL document in packages/vron_graphql_client/graphql/queries/project.graphql
-- [ ] T069 [P] [US2] Create UpdateProject mutation GraphQL document in packages/vron_graphql_client/graphql/mutations/update_project.graphql
-- [ ] T070 [US2] Run graphql_codegen to generate type-safe query/mutation classes
-- [ ] T071 [US2] Create ProjectRepository with fetchProjects, fetchProject, updateProject methods in packages/vron_graphql_client/lib/src/repositories/project_repository.dart
+- [X] T067 [P] [US2] Create Projects query GraphQL document in packages/vron_graphql_client/graphql/queries/projects.graphql
+- [X] T068 [P] [US2] Create Project query (single) GraphQL document in packages/vron_graphql_client/graphql/queries/project.graphql
+- [X] T069 [P] [US2] Create UpdateProject mutation GraphQL document in packages/vron_graphql_client/graphql/mutations/update_project.graphql
+- [X] T070 [US2] Run graphql_codegen to generate type-safe query/mutation classes
+- [X] T071 [US2] Create ProjectRepository with fetchProjects, fetchProject, updateProject methods in packages/vron_graphql_client/lib/src/repositories/project_repository.dart
 
 ### Data Models for User Story 2
 
-- [ ] T072 [P] [US2] Create Project Drift entity in lib/core/database/entities/project.dart
-- [ ] T073 [P] [US2] Create ProjectsNotifier for state management in lib/features/projects/notifiers/projects_notifier.dart
-- [ ] T074 [US2] Implement cache-first fetch strategy in ProjectRepository
+- [X] T072 [P] [US2] Create Project Drift entity in lib/core/database/entities/project.dart
+- [X] T073 [P] [US2] Create ProjectsNotifier for state management in lib/features/projects/notifiers/projects_notifier.dart
+- [X] T074 [US2] Implement cache-first fetch strategy in ProjectRepository
 
 ### UI Implementation for User Story 2
 
-- [ ] T075 [P] [US2] Create ProjectsListScreen with ListView.builder in lib/features/projects/screens/projects_list_screen.dart
-- [ ] T076 [P] [US2] Create ProjectCard widget for list items in lib/features/projects/widgets/project_card.dart
-- [ ] T077 [P] [US2] Create ProjectDetailScreen with project info display in lib/features/projects/screens/project_detail_screen.dart
-- [ ] T078 [US2] Create ProjectEditForm widget for name/description/status editing in lib/features/projects/widgets/project_edit_form.dart
-- [ ] T079 [US2] Implement pull-to-refresh for manual cache invalidation in lib/features/projects/screens/projects_list_screen.dart
-- [ ] T080 [US2] Add offline indicator when showing cached data in lib/features/projects/widgets/offline_indicator.dart
-- [ ] T081 [US2] Create bottom navigation bar with projects/demos/settings tabs in lib/core/widgets/app_navigation.dart
+- [X] T075 [P] [US2] Create ProjectsListScreen with ListView.builder in lib/features/projects/screens/projects_list_screen.dart
+- [X] T076 [P] [US2] Create ProjectCard widget for list items in lib/features/projects/widgets/project_card.dart
+- [X] T077 [P] [US2] Create ProjectDetailScreen with project info display in lib/features/projects/screens/project_detail_screen.dart
+- [X] T078 [US2] Create ProjectEditForm widget for name/description/status editing in lib/features/projects/widgets/project_edit_form.dart
+- [X] T079 [US2] Implement pull-to-refresh for manual cache invalidation in lib/features/projects/screens/projects_list_screen.dart
+- [X] T080 [US2] Add offline indicator when showing cached data in lib/features/projects/widgets/offline_indicator.dart
+- [X] T081 [US2] Create bottom navigation bar with projects/demos/settings tabs in lib/core/widgets/app_navigation.dart
 
 ### Offline Sync for User Story 2 (Constitution Principle II)
 
