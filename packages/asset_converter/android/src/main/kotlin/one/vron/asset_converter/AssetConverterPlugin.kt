@@ -69,6 +69,8 @@ class AssetConverterPlugin : FlutterPlugin, MethodCallHandler, EventChannel.Stre
             "convertUsdzToGlb" -> handleConvertUsdzToGlb(call, result)
             "extractNavmesh" -> handleExtractNavmesh(call, result)
             "cancelConversion" -> handleCancelConversion(result)
+            "generateNavmesh_v1" -> handleGenerateNavmeshV1(call, result)
+            "cancelNavmeshGeneration" -> handleCancelNavmeshGeneration(result)
             else -> result.notImplemented()
         }
     }
@@ -283,6 +285,33 @@ class AssetConverterPlugin : FlutterPlugin, MethodCallHandler, EventChannel.Stre
                 null
             )
         }
+    }
+
+    /**
+     * Handles generateNavmesh_v1 method call
+     *
+     * Returns UNSUPPORTED_PLATFORM error as navmesh generation is iOS-only
+     * Uses Recast Navigation library which is not available on Android
+     */
+    private fun handleGenerateNavmeshV1(call: MethodCall, result: Result) {
+        result.error(
+            "UNSUPPORTED_PLATFORM",
+            "Navmesh generation is only supported on iOS. Android does not support Recast Navigation library.",
+            null
+        )
+    }
+
+    /**
+     * Handles cancelNavmeshGeneration method call
+     *
+     * Returns UNSUPPORTED_PLATFORM error as navmesh generation is iOS-only
+     */
+    private fun handleCancelNavmeshGeneration(result: Result) {
+        result.error(
+            "UNSUPPORTED_PLATFORM",
+            "Navmesh generation cancellation is only supported on iOS.",
+            null
+        )
     }
 
     // MARK: - EventChannel.StreamHandler

@@ -16,10 +16,14 @@ import SceneKit
 public class AssetConverterPlugin: NSObject, FlutterPlugin {
     private var methodChannel: FlutterMethodChannel?
     private var eventChannel: FlutterEventChannel?
+    private var navmeshProgressChannel: FlutterEventChannel?
     private var eventSink: FlutterEventSink?
+    private var navmeshProgressSink: FlutterEventSink?
 
     private var isConverting: Bool = false
     private var shouldCancel: Bool = false
+    private var navMeshBuilder: NavMeshBuilder?
+    private var currentNavmeshTask: Task<Void, Never>?
 
     public static func register(with registrar: FlutterPluginRegistrar) {
         let methodChannel = FlutterMethodChannel(
@@ -32,12 +36,19 @@ public class AssetConverterPlugin: NSObject, FlutterPlugin {
             binaryMessenger: registrar.messenger()
         )
 
+        let navmeshProgressChannel = FlutterEventChannel(
+            name: "com.vron.asset_converter/navmesh_progress",
+            binaryMessenger: registrar.messenger()
+        )
+
         let instance = AssetConverterPlugin()
         instance.methodChannel = methodChannel
         instance.eventChannel = eventChannel
+        instance.navmeshProgressChannel = navmeshProgressChannel
 
         registrar.addMethodCallDelegate(instance, channel: methodChannel)
         eventChannel.setStreamHandler(instance)
+        navmeshProgressChannel.setStreamHandler(NavmeshProgressStreamHandler(plugin: instance))
     }
 
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -72,6 +83,20 @@ public class AssetConverterPlugin: NSObject, FlutterPlugin {
 
         case "cancelConversion":
             handleCancelConversion(result: result)
+
+        case "generateNavmesh_v1":
+            guard let args = call.arguments as? [String: Any] else {
+                result(FlutterError(
+                    code: "INVALID_ARGUMENTS",
+                    message: "Missing required arguments",
+                    details: nil
+                ))
+                return
+            }
+            handleGenerateNavmesh(args: args, result: result)
+
+        case "cancelNavmeshGeneration":
+            handleCancelNavmeshGeneration(result: result)
 
         default:
             result(FlutterMethodNotImplemented)
@@ -319,6 +344,124 @@ public class AssetConverterPlugin: NSObject, FlutterPlugin {
         }
     }
 
+    private func handleGenerateNavmesh(args: [String: Any], result: @escaping FlutterResult) {
+        guard let glbPath = args["glbPath"] as? String,
+              let navmeshPath = args["navmeshPath"] as? String,
+              let agentHeight = args["agentHeight"] as? Double,
+              let agentRadius = args["agentRadius"] as? Double,
+              let maxSlope = args["maxSlope"] as? Double else {
+            result(FlutterError(
+                code: "INVALID_ARGUMENTS",
+                message: "Missing required arguments: glbPath, navmeshPath, agentHeight, agentRadius, maxSlope",
+                details: nil
+            ))
+            return
+        }
+
+        // Check if file exists
+        guard FileManager.default.fileExists(atPath: glbPath) else {
+            result(FlutterError(
+                code: "FILE_NOT_FOUND",
+                message: "GLB file not found at path: \(glbPath)",
+                details: nil
+            ))
+            return
+        }
+
+        // Create parameters
+        let parameters = NavMeshBuilder.Parameters(
+            agentHeight: Float(agentHeight),
+            agentRadius: Float(agentRadius),
+            maxSlope: Float(maxSlope)
+        )
+
+        // Validate parameters
+        do {
+            try parameters.validate()
+        } catch let error as NavMeshBuilder.NavMeshError {
+            result(FlutterError(
+                code: error.code,
+                message: error.message,
+                details: nil
+            ))
+            return
+        } catch {
+            result(FlutterError(
+                code: "INVALID_PARAMETERS",
+                message: error.localizedDescription,
+                details: nil
+            ))
+            return
+        }
+
+        // Create NavMeshBuilder
+        let builder = NavMeshBuilder()
+        self.navMeshBuilder = builder
+
+        // Generate navmesh asynchronously
+        let task = Task {
+            do {
+                let navmeshResult = try await builder.generateNavmesh(
+                    glbPath: glbPath,
+                    navmeshPath: navmeshPath,
+                    parameters: parameters,
+                    progress: { [weak self] progress in
+                        DispatchQueue.main.async {
+                            self?.navmeshProgressSink?(progress)
+                        }
+                    }
+                )
+
+                // Return result on main thread
+                await MainActor.run {
+                    let resultDict: [String: Any] = [
+                        "success": navmeshResult.success,
+                        "vertexCount": navmeshResult.vertexCount,
+                        "triangleCount": navmeshResult.triangleCount
+                    ]
+                    result(resultDict)
+                    self.navMeshBuilder = nil
+                }
+            } catch let error as NavMeshBuilder.NavMeshError {
+                await MainActor.run {
+                    result(FlutterError(
+                        code: error.code,
+                        message: error.message,
+                        details: nil
+                    ))
+                    self.navMeshBuilder = nil
+                }
+            } catch {
+                await MainActor.run {
+                    result(FlutterError(
+                        code: "GENERATION_FAILED",
+                        message: "Navmesh generation failed: \(error.localizedDescription)",
+                        details: nil
+                    ))
+                    self.navMeshBuilder = nil
+                }
+            }
+        }
+
+        self.currentNavmeshTask = task
+    }
+
+    private func handleCancelNavmeshGeneration(result: @escaping FlutterResult) {
+        if let builder = navMeshBuilder {
+            builder.cancel()
+            currentNavmeshTask?.cancel()
+            currentNavmeshTask = nil
+            navMeshBuilder = nil
+            result(nil)
+        } else {
+            result(FlutterError(
+                code: "NO_ACTIVE_GENERATION",
+                message: "No active navmesh generation to cancel",
+                details: nil
+            ))
+        }
+    }
+
     // MARK: - Helper Methods
 
     private func performActualConversion(
@@ -363,6 +506,28 @@ extension AssetConverterPlugin: FlutterStreamHandler {
 
     public func onCancel(withArguments arguments: Any?) -> FlutterError? {
         self.eventSink = nil
+        return nil
+    }
+}
+
+// MARK: - NavmeshProgressStreamHandler
+
+@available(iOS 14.0, *)
+class NavmeshProgressStreamHandler: NSObject, FlutterStreamHandler {
+    weak var plugin: AssetConverterPlugin?
+
+    init(plugin: AssetConverterPlugin) {
+        self.plugin = plugin
+        super.init()
+    }
+
+    func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
+        plugin?.navmeshProgressSink = events
+        return nil
+    }
+
+    func onCancel(withArguments arguments: Any?) -> FlutterError? {
+        plugin?.navmeshProgressSink = nil
         return nil
     }
 }

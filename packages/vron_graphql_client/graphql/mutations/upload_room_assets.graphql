@@ -1,0 +1,19 @@
+# T170: UploadRoomAssets mutation
+# Associate uploaded GLB files with room after successful S3 upload
+# Updates room.sceneGlbUrl and room.navmeshGlbUrl with CDN URLs
+
+mutation UploadRoomAssets($input: UploadRoomAssetsInput!) {
+  uploadRoomAssets(input: $input) {
+    id
+    projectId
+    name
+    scanDate
+    sceneGlbUrl
+    navmeshGlbUrl
+    sceneFileSize
+    navmeshFileSize
+    processingStatus
+    createdAt
+    updatedAt
+  }
+}

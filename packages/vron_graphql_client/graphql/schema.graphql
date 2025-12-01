@@ -15,19 +15,6 @@ type SignInPayload {
   accessToken: String!
 }
 
-type Mutation {
-  """
-  Authenticate user with email/password credentials.
-  Returns JWT access token to be encoded in base64 AUTH_CODE.
-  """
-  signIn(input: SignInInput!): SignInPayload!
-
-  """
-  Terminate current user session. Invalidates access token on server.
-  """
-  signOut: Boolean!
-}
-
 # ============================================================================
 # Projects
 # ============================================================================
@@ -46,19 +33,6 @@ type Project {
 enum ProjectStatus {
   ACTIVE
   INACTIVE
-}
-
-type Query {
-  """
-  Fetch all projects for authenticated user.
-  Supports pagination via first/after cursor pattern.
-  """
-  projects(first: Int = 20, after: String): ProjectConnection!
-
-  """
-  Fetch single project by ID with all rooms.
-  """
-  project(id: ID!): Project
 }
 
 type ProjectConnection {
@@ -83,14 +57,6 @@ input UpdateProjectInput {
   name: String
   description: String
   status: ProjectStatus
-}
-
-type Mutation {
-  """
-  Update project metadata (name, description, status).
-  Users cannot create or delete projects (managed via web platform).
-  """
-  updateProject(input: UpdateProjectInput!): Project!
 }
 
 # ============================================================================
@@ -118,18 +84,6 @@ enum RoomProcessingStatus {
   FAILED
 }
 
-type Query {
-  """
-  Fetch all rooms for a specific project.
-  """
-  rooms(projectId: ID!): [Room!]!
-
-  """
-  Fetch single room by ID.
-  """
-  room(id: ID!): Room
-}
-
 input CreateRoomInput {
   projectId: ID!
   name: String!
@@ -147,25 +101,6 @@ input UploadRoomAssetsInput {
 input UpdateRoomInput {
   id: ID!
   name: String
-}
-
-type Mutation {
-  """
-  Create new room entry after successful scan.
-  Returns room ID for subsequent asset upload.
-  """
-  createRoom(input: CreateRoomInput!): Room!
-
-  """
-  Associate uploaded GLB files with room after successful upload.
-  Updates room.sceneGlbUrl and room.navmeshGlbUrl with CDN URLs.
-  """
-  uploadRoomAssets(input: UploadRoomAssetsInput!): Room!
-
-  """
-  Update room name (user-editable after auto-generation).
-  """
-  updateRoom(input: UpdateRoomInput!): Room!
 }
 
 # ============================================================================
@@ -194,14 +129,6 @@ enum FileType {
   NAVMESH_GLB
 }
 
-type Query {
-  """
-  Request presigned upload URL for scene or navmesh GLB file.
-  Returns S3 presigned URL valid for 1 hour.
-  """
-  requestUploadUrl(input: RequestUploadUrlInput!): UploadUrl!
-}
-
 # ============================================================================
 # Demo Assets
 # ============================================================================
@@ -220,32 +147,6 @@ type DemoAsset {
 enum DemoTheme {
   SAILING
   AVIATION
-}
-
-type Query {
-  """
-  Fetch all demo assets for sailing/aviation themes.
-  Cached for 7 days on client.
-  """
-  demoAssets(theme: DemoTheme): [DemoAsset!]!
-}
-
-# ============================================================================
-# Real-Time Subscriptions
-# ============================================================================
-
-type Subscription {
-  """
-  Subscribe to project updates for authenticated user.
-  Receives events when projects are modified on web platform.
-  """
-  projectUpdated: Project!
-
-  """
-  Subscribe to room updates for a specific project.
-  Receives events when rooms are uploaded by other devices.
-  """
-  roomUpdated(projectId: ID!): Room!
 }
 
 # ============================================================================
@@ -277,3 +178,47 @@ Error codes in extensions.code:
 - RATE_LIMIT_EXCEEDED: Too many requests (429)
 - INTERNAL_SERVER_ERROR: Unexpected server error (500)
 """
+
+# ============================================================================
+# Root Types
+# ============================================================================
+
+type Query {
+  # Authentication - none needed (mutations only)
+
+  # Projects
+  projects(first: Int = 20, after: String): ProjectConnection!
+  project(id: ID!): Project
+
+  # Rooms
+  rooms(projectId: ID!): [Room!]!
+  room(id: ID!): Room
+
+  # File Uploads
+  requestUploadUrl(input: RequestUploadUrlInput!): UploadUrl!
+
+  # Demo Assets
+  demoAssets(theme: DemoTheme): [DemoAsset!]!
+}
+
+type Mutation {
+  # Authentication
+  signIn(input: SignInInput!): SignInPayload!
+  signOut: Boolean!
+
+  # Projects
+  updateProject(input: UpdateProjectInput!): Project!
+
+  # Rooms
+  createRoom(input: CreateRoomInput!): Room!
+  uploadRoomAssets(input: UploadRoomAssetsInput!): Room!
+  updateRoom(input: UpdateRoomInput!): Room!
+}
+
+type Subscription {
+  # Projects
+  projectUpdated: Project!
+
+  # Rooms
+  roomUpdated(projectId: ID!): Room!
+}

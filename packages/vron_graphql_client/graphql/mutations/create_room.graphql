@@ -1,0 +1,15 @@
+# T168: CreateRoom mutation
+# Creates new room entry after successful scan
+# Returns room ID for subsequent asset upload
+
+mutation CreateRoom($input: CreateRoomInput!) {
+  createRoom(input: $input) {
+    id
+    projectId
+    name
+    scanDate
+    processingStatus
+    createdAt
+    updatedAt
+  }
+}

@@ -1,0 +1,11 @@
+# T169: RequestUploadUrl query
+# Request presigned S3 upload URL for scene or navmesh GLB file
+# Returns presigned URL valid for 1 hour
+
+query RequestUploadUrl($input: RequestUploadUrlInput!) {
+  requestUploadUrl(input: $input) {
+    uploadUrl
+    fileKey
+    expiresAt
+  }
+}

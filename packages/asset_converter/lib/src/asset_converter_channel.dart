@@ -182,6 +182,105 @@ class AssetConverterChannel {
     }
   }
 
+  /// Generate navigation mesh from GLB file (v1 API)
+  ///
+  /// **iOS Only** - Uses Recast Navigation library for high-quality navmesh generation
+  ///
+  /// Parameters:
+  /// - [glbPath]: Path to input GLB scene file
+  /// - [navmeshPath]: Path where navmesh GLB will be saved
+  /// - [agentHeight]: Agent height in meters (0.3 - 3.0)
+  /// - [agentRadius]: Agent radius in meters (0.1 - 2.0)
+  /// - [maxSlope]: Maximum walkable slope in degrees (0 - 60)
+  ///
+  /// Returns: [NavmeshGenerationResult] with vertex/triangle counts
+  ///
+  /// Throws:
+  /// - [UnsupportedPlatformException] on Android (iOS only feature)
+  /// - [FileNotFoundException] if input GLB doesn't exist
+  /// - [InvalidGLBFormatException] if GLB file is corrupted
+  /// - [InvalidParametersException] if agent parameters are invalid
+  /// - [NoGeometryException] if no walkable surfaces found
+  /// - [NavmeshGenerationFailedException] if generation fails
+  /// - [AssetConverterException] for other errors
+  ///
+  /// Performance: Should complete in <15 seconds for typical room scans (~2000 vertices)
+  Future<NavmeshGenerationResult> generateNavmesh({
+    required String glbPath,
+    required String navmeshPath,
+    required double agentHeight,
+    required double agentRadius,
+    required double maxSlope,
+  }) async {
+    try {
+      final result = await _methodChannel.invokeMethod<Map<Object?, Object?>>(
+        'generateNavmesh_v1',
+        {
+          'glbPath': glbPath,
+          'navmeshPath': navmeshPath,
+          'agentHeight': agentHeight,
+          'agentRadius': agentRadius,
+          'maxSlope': maxSlope,
+        },
+      );
+
+      if (result == null) {
+        throw AssetConverterException('Navmesh generation returned null result');
+      }
+
+      return NavmeshGenerationResult.fromMap(Map<String, dynamic>.from(result));
+    } on PlatformException catch (e) {
+      switch (e.code) {
+        case 'UNSUPPORTED_PLATFORM':
+          throw UnsupportedPlatformException(
+            e.message ?? 'Navmesh generation is only supported on iOS',
+          );
+        case 'FILE_NOT_FOUND':
+          throw FileNotFoundException(e.message ?? 'GLB file not found', glbPath);
+        case 'INVALID_GLB_FORMAT':
+          throw InvalidGLBFormatException(
+            e.message ?? 'Invalid or corrupted GLB file',
+          );
+        case 'INVALID_PARAMETERS':
+          throw InvalidParametersException(
+            e.message ?? 'Invalid agent parameters',
+          );
+        case 'NO_GEOMETRY':
+          throw NoGeometryException(
+            e.message ?? 'No walkable geometry found in scene',
+          );
+        case 'GENERATION_FAILED':
+        case 'EXPORT_FAILED':
+          throw NavmeshGenerationFailedException(
+            e.message ?? 'Navmesh generation failed',
+          );
+        case 'CANCELLED':
+          throw NavmeshGenerationCancelledException(
+            e.message ?? 'Navmesh generation was cancelled',
+          );
+        default:
+          throw AssetConverterException(
+            'Failed to generate navmesh: ${e.message}',
+            code: e.code,
+          );
+      }
+    }
+  }
+
+  /// Cancel ongoing navmesh generation
+  ///
+  /// Throws [AssetConverterException] if cancel fails
+  Future<void> cancelNavmeshGeneration() async {
+    try {
+      await _methodChannel.invokeMethod<void>('cancelNavmeshGeneration');
+    } on PlatformException catch (e) {
+      throw AssetConverterException(
+        'Failed to cancel navmesh generation: ${e.message}',
+        code: e.code,
+      );
+    }
+  }
+
   /// Stream of conversion progress updates
   ///
   /// Emits [ConversionProgress] objects with:
@@ -402,4 +501,80 @@ class ConversionFailedException extends AssetConverterException {
 class NavmeshExtractionFailedException extends AssetConverterException {
   const NavmeshExtractionFailedException(String message)
       : super(message, code: 'NAVMESH_EXTRACTION_FAILED');
+}
+
+/// Navmesh generation result (v1 API)
+class NavmeshGenerationResult {
+  /// Whether generation succeeded
+  final bool success;
+
+  /// Number of vertices in generated navmesh
+  final int vertexCount;
+
+  /// Number of triangles in generated navmesh
+  final int triangleCount;
+
+  /// Optional error message if failed
+  final String? errorMessage;
+
+  const NavmeshGenerationResult({
+    required this.success,
+    required this.vertexCount,
+    required this.triangleCount,
+    this.errorMessage,
+  });
+
+  factory NavmeshGenerationResult.fromMap(Map<String, dynamic> map) {
+    return NavmeshGenerationResult(
+      success: map['success'] as bool? ?? false,
+      vertexCount: map['vertexCount'] as int? ?? 0,
+      triangleCount: map['triangleCount'] as int? ?? 0,
+      errorMessage: map['errorMessage'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'success': success,
+      'vertexCount': vertexCount,
+      'triangleCount': triangleCount,
+      if (errorMessage != null) 'errorMessage': errorMessage,
+    };
+  }
+}
+
+/// Unsupported platform exception (feature not available on this platform)
+class UnsupportedPlatformException extends AssetConverterException {
+  const UnsupportedPlatformException(String message)
+      : super(message, code: 'UNSUPPORTED_PLATFORM');
+}
+
+/// Invalid GLB format exception
+class InvalidGLBFormatException extends AssetConverterException {
+  const InvalidGLBFormatException(String message)
+      : super(message, code: 'INVALID_GLB_FORMAT');
+}
+
+/// Invalid parameters exception
+class InvalidParametersException extends AssetConverterException {
+  const InvalidParametersException(String message)
+      : super(message, code: 'INVALID_PARAMETERS');
+}
+
+/// No geometry exception (no walkable surfaces found)
+class NoGeometryException extends AssetConverterException {
+  const NoGeometryException(String message)
+      : super(message, code: 'NO_GEOMETRY');
+}
+
+/// Navmesh generation failed exception
+class NavmeshGenerationFailedException extends AssetConverterException {
+  const NavmeshGenerationFailedException(String message)
+      : super(message, code: 'GENERATION_FAILED');
+}
+
+/// Navmesh generation cancelled exception
+class NavmeshGenerationCancelledException extends AssetConverterException {
+  const NavmeshGenerationCancelledException(String message)
+      : super(message, code: 'CANCELLED');
 }
