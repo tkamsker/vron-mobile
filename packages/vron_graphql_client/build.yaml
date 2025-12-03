@@ -1,23 +1,10 @@
-# GraphQL Code Generation Configuration
-# Generates type-safe Dart classes from GraphQL operations using Artemis
-
 targets:
   $default:
     builders:
-      artemis:
+      drift_dev:
         enabled: true
         options:
-          # Schema location
-          schema_mapping:
-            - schema: graphql/schema.graphql
-              # Watch for GraphQL operation files
-              queries_glob: graphql/**/*.graphql
-              # Output configuration
-              output: lib/src/generated/graphql_api.dart
-
-          # Scalar mappings
-          scalar_mapping:
-            - graphql_type: DateTime
-              dart_type: DateTime
-            - graphql_type: JSON
-              dart_type: Map<String, dynamic>
+          # Disable manager generation to avoid API compatibility issues
+          generate_manager: false
+      artemis:
+        enabled: false

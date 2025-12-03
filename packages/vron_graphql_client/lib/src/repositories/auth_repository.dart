@@ -168,6 +168,6 @@ class SignOutResult {
 ///
 /// Provides singleton instance with injected GraphQL client
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
-  final client = ref.watch(graphQLClientProvider);
+  final client = ref.watch(graphqlClientProvider);
   return AuthRepository(client);
 });

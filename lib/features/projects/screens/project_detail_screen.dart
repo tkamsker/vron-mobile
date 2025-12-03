@@ -2,8 +2,12 @@ import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:roomplan_flutter/roomplan_flutter.dart';
+import 'package:uuid/uuid.dart';
 import '../../../core/database/database.dart';
-import '../../scan/screens/scan_screen.dart';
+import '../../scan/models/scan_data.dart';
+import '../../scan/screens/scan_complete_screen.dart';
 
 /// Project detail screen with tabs
 ///
@@ -24,7 +28,7 @@ class ProjectDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late TabController _tabController;
 
   // Controllers for editable fields
@@ -32,22 +36,237 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
   late TextEditingController _slugController;
   late TextEditingController _descriptionController;
 
+  // LiDAR / RoomPlan availability state (for gating "Add Room Scan" button)
+  bool _isCheckingLidar = true;
+
+  /// True if this device hardware + iOS version support RoomPlan / LiDAR
+  bool _deviceSupportsLidar = false;
+
+  /// True if the user has granted camera permission
+  bool _hasCameraPermission = false;
+
+  bool get _canScanWithLidar =>
+      Platform.isIOS && _deviceSupportsLidar && _hasCameraPermission;
+
+  bool _isScanning = false;
+  late final RoomPlanScanner _roomScanner;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _tabController = TabController(length: 3, vsync: this);
     _nameController = TextEditingController(text: widget.project.name);
     _slugController = TextEditingController(text: widget.project.slug);
     _descriptionController = TextEditingController(text: '');
+
+    _roomScanner = RoomPlanScanner();
+
+    // Proactively check LiDAR + camera availability on iOS so we can
+    // enable/disable the "Add Room Scan" button appropriately.
+    _checkLidarAvailabilityForProject();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _tabController.dispose();
     _nameController.dispose();
     _slugController.dispose();
     _descriptionController.dispose();
+    _roomScanner.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    // When returning from background (e.g., after user changed permissions in Settings),
+    // re-check LiDAR hardware + camera permission and update the "Add Room Scan" button.
+    if (state == AppLifecycleState.resumed) {
+      _checkLidarAvailabilityForProject();
+    }
+  }
+
+  /// Check if this device can perform LiDAR room scans for this project.
+  ///
+          /// Mirrors the logic used in the main scan entry:
+  /// - Only runs on iOS
+  /// - Uses `RoomPlanScanner.isSupported()` to detect LiDAR hardware + RoomPlan
+  /// - If hardware is supported, checks/requests camera permission (required for RoomPlan)
+  Future<void> _checkLidarAvailabilityForProject() async {
+    if (!Platform.isIOS) {
+      setState(() {
+        _isCheckingLidar = false;
+        _deviceSupportsLidar = false;
+        _hasCameraPermission = false;
+      });
+      return;
+    }
+
+    try {
+      // Step 1: Check if this device has LiDAR and supports RoomPlan
+      final hardwareSupported = await RoomPlanScanner.isSupported();
+
+      if (!mounted) return;
+
+      if (!hardwareSupported) {
+        setState(() {
+          _isCheckingLidar = false;
+          _deviceSupportsLidar = false;
+          _hasCameraPermission = false;
+        });
+
+        // Educate user if device lacks LiDAR hardware
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'LiDAR scanning requires iPhone 12 Pro or newer, or iPad Pro (2020) or newer.',
+            ),
+            duration: Duration(seconds: 4),
+          ),
+        );
+        return;
+      }
+
+      // Device supports LiDAR - Step 2: ensure camera permission
+      var status = await Permission.camera.status;
+      if (!status.isGranted) {
+        final result = await Permission.camera.request();
+        status = result;
+      }
+
+      final granted = status.isGranted;
+
+      if (!mounted) return;
+
+      setState(() {
+        _isCheckingLidar = false;
+        _deviceSupportsLidar = true;
+        _hasCameraPermission = granted;
+      });
+
+      if (!granted) {
+        // Inform the user why the button is disabled
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'Camera permission is required to scan rooms with LiDAR. '
+              'You can enable it later in Settings.',
+            ),
+            action: SnackBarAction(
+              label: 'Settings',
+              onPressed: () {
+                openAppSettings();
+              },
+            ),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isCheckingLidar = false;
+        _deviceSupportsLidar = false;
+        _hasCameraPermission = false;
+      });
+    }
+  }
+
+  Future<void> _startRoomScanForProject(BuildContext context) async {
+    if (!_canScanWithLidar || _isScanning) return;
+
+    setState(() {
+      _isScanning = true;
+    });
+
+    try {
+      // Double-check camera permission before starting RoomPlan
+      var status = await Permission.camera.status;
+      if (!status.isGranted) {
+        final result = await Permission.camera.request();
+        status = result;
+      }
+
+      if (!status.isGranted) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'Camera permission is required to start LiDAR scanning.',
+            ),
+            action: SnackBarAction(
+              label: 'Settings',
+              onPressed: openAppSettings,
+            ),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+        return;
+      }
+
+      const configuration = ScanConfiguration(
+        enableRealtimeUpdates: false,
+        detectDoors: true,
+        detectWindows: true,
+      );
+
+      final result = await _roomScanner.startScanning(configuration: configuration);
+
+      if (!mounted) return;
+
+      if (result != null) {
+        final now = DateTime.now();
+        final durationSeconds = result.metadata.scanDuration.inSeconds.toDouble();
+        final startedAt = now.subtract(Duration(seconds: durationSeconds.toInt()));
+
+        final scanData = ScanData(
+          id: const Uuid().v4(),
+          projectId: widget.project.id,
+          projectName: widget.project.name,
+          startedAt: startedAt,
+          completedAt: now,
+          pointsCollected: (result.room.walls.length +
+                  result.room.doors.length +
+                  result.room.windows.length) *
+              100,
+          durationSeconds: durationSeconds,
+          isGuestMode: false,
+          status: ScanStatus.completed,
+        );
+
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => ScanCompleteScreen(
+              scanData: scanData,
+              thumbnailPath: null,
+            ),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Scan was cancelled'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error during scan: $e'),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isScanning = false;
+        });
+      }
+    }
   }
 
   @override
@@ -314,17 +533,10 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => ScanScreen(
-                        projectId: widget.project.id,
-                        projectName: widget.project.name,
-                      ),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.3d_rotation),
+                onPressed: (!_isCheckingLidar && _canScanWithLidar)
+                    ? () => _startRoomScanForProject(context)
+                    : null,
+                icon: const Icon(Icons.view_in_ar),
                 label: const Text('Add Room Scan'),
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:vron_mobile/core/auth/auth_notifier.dart';
-import 'package:vron_mobile/features/scan/screens/scan_screen.dart';
 
 /// Login screen matching Vron_hero.jpg design
 ///
